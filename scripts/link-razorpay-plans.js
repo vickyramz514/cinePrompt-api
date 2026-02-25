@@ -1,0 +1,41 @@
+/**
+ * Link Razorpay plan IDs to SubscriptionPlan (when plans created manually in Dashboard)
+ * Run: RAZORPAY_PLAN_CREATOR=plan_xxx npx node scripts/link-razorpay-plans.js
+ *
+ * Or set all at once:
+ * RAZORPAY_PLAN_STARTER=plan_xxx RAZORPAY_PLAN_CREATOR=plan_yyy RAZORPAY_PLAN_PRO=plan_zzz RAZORPAY_PLAN_ULTRA=plan_aaa npx node scripts/link-razorpay-plans.js
+ */
+
+import { PrismaClient } from '@prisma/client';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const prisma = new PrismaClient();
+
+const planVars = [
+  { slug: 'starter', envKey: 'RAZORPAY_PLAN_STARTER' },
+  { slug: 'creator', envKey: 'RAZORPAY_PLAN_CREATOR' },
+  { slug: 'ultra', envKey: 'RAZORPAY_PLAN_ULTRA' },
+];
+
+async function main() {
+  for (const { slug, envKey } of planVars) {
+    const planId = process.env[envKey];
+    if (!planId) continue;
+
+    const updated = await prisma.subscriptionPlan.updateMany({
+      where: { slug },
+      data: { razorpayPlanId: planId },
+    });
+    if (updated.count > 0) {
+      console.log(`Linked ${slug} → ${planId}`);
+    } else {
+      console.log(`Plan ${slug} not found in DB, skipping`);
+    }
+  }
+}
+
+main()
+  .catch(console.error)
+  .finally(() => prisma.$disconnect());

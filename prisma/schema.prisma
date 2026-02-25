@@ -1,0 +1,638 @@
+// =============================================================================
+// CinePrompt AI - Enterprise-Grade Database Schema
+// PostgreSQL + Prisma ORM | Designed for 1M+ users, millions of video jobs
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// ENUMS - Type safety & query optimization
+// =============================================================================
+
+enum UserPlan {
+  FREE
+  STARTER
+  CREATOR
+  PRO
+  ULTRA
+}
+
+enum UserRole {
+  USER
+  CREATOR
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+  GITHUB
+  APPLE
+}
+
+enum VideoJobStatus {
+  PENDING
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum JobStepType {
+  UPLOADED      // Source uploaded
+  QUEUED        // In processing queue
+  PROCESSING    // General processing
+  AI_GENERATION // AI model inference
+  RENDERING     // Video rendering
+  UPLOADING     // Output upload to storage
+  COMPLETED     // Step success
+  FAILED        // Step failure
+}
+
+enum JobStepStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  SKIPPED
+  RETRYING
+}
+
+enum TransactionType {
+  VIDEO_GENERATION
+  VIDEO_REFUND
+  PURCHASE
+  SUBSCRIPTION
+  BONUS
+  ADMIN_ADJUSTMENT
+  REFERRAL
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+  REVERSED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  PAST_DUE
+  TRIALING
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+  DISPUTED
+}
+
+enum PaymentProvider {
+  STRIPE
+  RAZORPAY
+  PAYPAL
+  MANUAL
+}
+
+enum NotificationType {
+  JOB_COMPLETED
+  JOB_FAILED
+  CREDITS_LOW
+  SUBSCRIPTION_RENEWAL
+  PAYMENT_RECEIVED
+  SYSTEM_ANNOUNCEMENT
+}
+
+enum NotificationChannel {
+  EMAIL
+  IN_APP
+  PUSH
+}
+
+enum ErrorSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// =============================================================================
+// USER & AUTHENTICATION
+// =============================================================================
+
+model User {
+  id            String       @id @default(uuid())
+  email         String       @unique
+  name          String
+  password      String?      // Null for OAuth-only users
+  provider      String?      // "google" | "email" | null - kept for migration compat
+  providerId    String?      // External provider user ID
+  avatar        String?
+  role          UserRole     @default(USER)
+  credits       Int          @default(0) // Cached balance; Wallet is source of truth
+  plan          UserPlan     @default(FREE)
+  planExpiresAt DateTime?
+  emailVerified Boolean      @default(false)
+  isActive      Boolean      @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  // Relations
+  profile           UserProfile?
+  refreshTokens     RefreshToken[]
+  wallet            Wallet?
+  transactions      Transaction[]
+  videoJobs         VideoJob[]
+  userSubscriptions UserSubscription[]
+  payments          Payment[]
+  apiUsage          ApiUsage[]
+  notifications     Notification[]
+  notificationPrefs NotificationPreference[]
+  auditLogs         AuditLog[]
+
+  @@index([email])
+  @@index([provider, providerId])
+  @@index([role])
+  @@index([plan])
+  @@index([createdAt])
+  @@index([isActive])
+}
+
+model UserProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  bio       String?  @db.Text
+  company   String?
+  website   String?
+  timezone  String?  @default("UTC")
+  locale    String?  @default("en")
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  userAgent String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+  revokedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+// =============================================================================
+// WALLET & CREDIT SYSTEM (Immutable Ledger Pattern)
+// =============================================================================
+
+model Wallet {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  balance        Int      @default(0) // Current balance (denormalized for performance)
+  totalCreditsIn Int      @default(0) // Lifetime credits added
+  totalCreditsOut Int     @default(0) // Lifetime credits used
+  version        Int      @default(0) // Optimistic locking
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user     User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ledger   CreditLedgerEntry[]
+  usages   CreditUsageLog[]
+
+  @@index([userId])
+  @@index([balance])
+}
+
+model CreditLedgerEntry {
+  id          String            @id @default(uuid())
+  walletId    String
+  amount      Int               // Positive = credit, Negative = debit
+  balanceAfter Int              // Snapshot after this entry
+  type        TransactionType
+  status      TransactionStatus @default(COMPLETED)
+  referenceId String?           // VideoJob id, Payment id, etc.
+  referenceType String?         // "video_job" | "payment" | "subscription"
+  description String?
+  metadata    Json?
+  createdAt   DateTime          @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId])
+  @@index([createdAt])
+  @@index([type])
+  @@index([referenceId, referenceType])
+  @@index([walletId, createdAt]) // Ledger history query
+}
+
+model CreditUsageLog {
+  id          String   @id @default(uuid())
+  walletId    String
+  amount      Int      // Always positive (usage amount)
+  jobId       String?
+  planId      String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId])
+  @@index([jobId])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// VIDEO JOB & PROCESSING PIPELINE
+// =============================================================================
+
+model VideoJob {
+  id             String         @id @default(uuid())
+  userId         String
+  prompt         String         @db.Text
+  negativePrompt String?        @db.Text
+  provider       String         @default("RUNWAY") // RUNWAY | REPLICATE
+  status         VideoJobStatus @default(PENDING)
+  progress       Int            @default(0)
+  priority       Int            @default(0)
+  creditsUsed    Int            @default(0)
+  creditsCost    Int            @default(0)
+  cost           Float?         // API cost USD
+  replicateId    String?        // Replicate prediction ID
+  runwayId       String?        // Runway task ID
+  storageKey     String?
+  videoUrl       String?
+  cdnUrl         String?        // CDN URL if configured
+  thumbnailUrl   String?
+  duration       Int?
+  resolution     String?
+  aspectRatio    String?
+  metadata       Json?
+  error          String?        @db.Text
+  retryCount     Int            @default(0)
+  maxRetries     Int            @default(3)
+  processingStartedAt  DateTime?
+  processingCompletedAt DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  completedAt    DateTime?
+
+  user     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  steps    JobStep[]
+  assets   VideoAsset[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([status, priority, createdAt])
+  @@index([userId, createdAt])
+  @@index([replicateId])
+  @@index([runwayId])
+}
+
+model JobStep {
+  id          String         @id @default(uuid())
+  jobId       String
+  stepType    JobStepType
+  stepOrder   Int            // Pipeline order (1, 2, 3...)
+  status      JobStepStatus  @default(PENDING)
+  progress    Int            @default(0)
+  retryCount  Int            @default(0)
+  maxRetries  Int            @default(2)
+  error       String?        @db.Text
+  errorCode   String?
+  inputData   Json?
+  outputData  Json?
+  startedAt   DateTime?
+  completedAt DateTime?
+  durationMs  Int?           // Processing time
+  workerId    String?         // For distributed processing
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  job VideoJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([jobId, stepOrder])
+  @@index([status])
+  @@index([stepType, status])
+  @@index([createdAt])
+}
+
+model VideoAsset {
+  id          String   @id @default(uuid())
+  jobId       String
+  assetType   String   // "video" | "thumbnail" | "preview"
+  storageKey  String
+  url         String?
+  mimeType    String?
+  sizeBytes   Int?
+  width       Int?
+  height     Int?
+  duration   Int?
+  metadata   Json?
+  createdAt   DateTime @default(now())
+
+  job VideoJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([assetType])
+}
+
+// =============================================================================
+// TRANSACTIONS (Legacy compatibility + enhanced)
+// =============================================================================
+
+model Transaction {
+  id          String            @id @default(uuid())
+  userId      String
+  amount      Int               // Credits delta
+  credits     Int               // Absolute amount
+  status      TransactionStatus @default(PENDING)
+  type        String            // VIDEO_GENERATION | PURCHASE | etc. - use TransactionType in app
+  referenceId String?
+  metadata    Json?
+  createdAt   DateTime          @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+}
+
+// =============================================================================
+// SUBSCRIPTION & PAYMENTS
+// =============================================================================
+
+model SubscriptionPlan {
+  id               String   @id @default(uuid())
+  name             String
+  slug             String   @unique
+  description      String?  @db.Text
+  priceCents       Int      @default(0)
+  currency         String   @default("INR")
+  credits          Int      @default(0)
+  creditsPerMonth  Int?     // For recurring
+  billingCycle     String?  // "monthly" | "yearly"
+  razorpayPlanId   String?  // Razorpay plan_xxx ID for subscription plans
+  features         Json?    // ["1080p", "priority"]
+  isActive         Boolean  @default(true)
+  sortOrder        Int      @default(0)
+  metadata         Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  subscriptions UserSubscription[]
+
+  @@index([slug])
+  @@index([isActive])
+  @@index([razorpayPlanId])
+}
+
+model UserSubscription {
+  id             String             @id @default(uuid())
+  userId         String
+  planId         String
+  status         SubscriptionStatus  @default(ACTIVE)
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd Boolean         @default(false)
+  cancelledAt   DateTime?
+  externalId    String?             // Stripe subscription ID
+  metadata      Json?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  user User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, planId])
+  @@index([userId])
+  @@index([planId])
+  @@index([status])
+  @@index([currentPeriodEnd])
+}
+
+model Payment {
+  id            String          @id @default(uuid())
+  userId        String
+  amountCents   Int
+  currency      String          @default("INR")
+  status        PaymentStatus   @default(PENDING)
+  provider      PaymentProvider
+  providerId    String?         // Stripe payment intent ID
+  providerData  Json?
+  creditsAdded Int?
+  subscriptionId String?
+  invoiceUrl   String?
+  metadata     Json?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([provider, providerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// API USAGE & ANALYTICS
+// =============================================================================
+
+model ApiUsage {
+  id        String   @id @default(uuid())
+  userId    String
+  endpoint  String
+  method    String
+  statusCode Int?
+  durationMs Int?
+  creditsUsed Int?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([endpoint])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+}
+
+// =============================================================================
+// NOTIFICATIONS
+// =============================================================================
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String?          @db.Text
+  data      Json?            // Deep link, job ID, etc.
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, readAt])
+  @@index([createdAt])
+}
+
+model NotificationPreference {
+  id        String   @id @default(uuid())
+  userId    String
+  channel   NotificationChannel
+  type      NotificationType
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channel, type])
+  @@index([userId])
+}
+
+// =============================================================================
+// ERROR LOGGING & SYSTEM
+// =============================================================================
+
+model ErrorLog {
+  id        String   @id @default(uuid())
+  severity  ErrorSeverity @default(MEDIUM)
+  code      String?
+  message   String   @db.Text
+  stack     String?  @db.Text
+  context   Json?    // userId, jobId, requestId
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([severity])
+  @@index([code])
+  @@index([createdAt])
+}
+
+model SystemSettings {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     Json
+  category  String?  // "billing" | "limits" | "feature_flags"
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+  @@index([category])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  action     String
+  resource   String   // "user" | "job" | "subscription"
+  resourceId String?
+  oldValue   Json?
+  newValue   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([resource, resourceId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model SystemMetrics {
+  id        String   @id @default(uuid())
+  metric    String   // "jobs_per_minute" | "revenue_daily"
+  value     Float
+  dimensions Json?   // { "status": "completed" }
+  timestamp DateTime @default(now())
+
+  @@index([metric])
+  @@index([timestamp])
+  @@index([metric, timestamp])
+}
+
+// =============================================================================
+// CREDIT LOCK - Pre-charge locking for safe deduction
+// =============================================================================
+
+model CreditLock {
+  id        String   @id @default(uuid())
+  userId    String
+  jobId     String   @unique // One lock per job
+  seconds   Int      // Video seconds locked
+  status    String   // LOCKED | CONSUMED | RELEASED
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([status])
+  @@index([userId, status])
+}
+
+// =============================================================================
+// API COST LOG - Provider cost tracking
+// =============================================================================
+
+model ApiCostLog {
+  id        String   @id @default(uuid())
+  userId    String
+  jobId     String?
+  provider  String   // "runway" | "replicate"
+  seconds   Int
+  cost      Float    // USD
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([provider])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+}
+
+// =============================================================================
+// ABUSE LOG - Violation tracking
+// =============================================================================
+
+model AbuseLog {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String   // RATE_LIMIT | CONCURRENT_JOB | PROMPT_SPAM | DAILY_CAP
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+}
