@@ -17,6 +17,23 @@ import { logger } from './utils/logger.js';
 
 const app = express();
 
+// CORS header normalization: if Access-Control-Allow-Origin gets a comma-separated value
+// (e.g. from misconfiguration), use only the matching origin to avoid "multiple values" error
+app.use((req, res, next) => {
+  const allowed = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
+    : ['http://localhost:3000'];
+  const origSetHeader = res.setHeader.bind(res);
+  res.setHeader = function (name, value) {
+    if (name.toLowerCase() === 'access-control-allow-origin' && typeof value === 'string' && value.includes(',')) {
+      const origins = value.split(',').map((o) => o.trim()).filter(Boolean);
+      value = allowed.includes(req.headers.origin) ? req.headers.origin : origins[0] || allowed[0];
+    }
+    return origSetHeader(name, value);
+  };
+  next();
+});
+
 // Security
 app.use(helmet());
 app.use(

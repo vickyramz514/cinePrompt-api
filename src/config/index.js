@@ -111,9 +111,20 @@ const config = {
     max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
   },
 
-  // CORS
+  // CORS - comma-separated for multiple origins (e.g. https://app.vercel.app,http://localhost:3000)
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: (() => {
+      const allowed = process.env.CORS_ORIGIN
+        ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
+        : ['http://localhost:3000'];
+      return (origin, callback) => {
+        if (!origin || allowed.includes(origin)) {
+          callback(null, origin || allowed[0]);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      };
+    })(),
     credentials: true,
   },
 };
