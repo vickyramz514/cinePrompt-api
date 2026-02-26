@@ -35,6 +35,7 @@ router.get('/', (req, res) => {
       },
       wallet: {
         balance: 'GET /api/wallet/balance (auth required)',
+        limits: 'GET /api/wallet/limits (auth required) - credits + maxDuration',
         history: 'GET /api/wallet/history (auth required)',
         add: 'POST /api/wallet/add (auth required)',
       },

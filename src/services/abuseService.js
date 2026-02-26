@@ -111,7 +111,8 @@ export const checkDailyVideoCap = async (userId, userPlan = 'FREE') => {
       planKey = sub.plan.slug.toUpperCase();
     }
   }
-  const limit = config.planLimits[planKey] ?? config.planLimits.FREE;
+  const planConfig = config.planLimits[planKey] ?? config.planLimits.FREE;
+  const limit = typeof planConfig === 'object' ? planConfig.videosPerDay : planConfig;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);

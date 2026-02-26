@@ -13,6 +13,7 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/balance', walletController.getBalance);
+router.get('/limits', walletController.getLimits);
 router.get('/history', walletController.getHistory);
 router.post('/add', walletController.addCredits);
 

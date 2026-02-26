@@ -26,10 +26,14 @@ export const googleTokenSchema = z.object({
 export const generateVideoSchema = z.object({
   prompt: z.string().min(5).max(2000),
   negativePrompt: z.string().max(1000).optional(),
-  duration: z.number().int().min(1).max(10).optional().default(5),
+  duration: z.number().int().min(1).max(60).optional(),
+  durationSeconds: z.number().int().min(1).max(60).optional(),
   aspectRatio: z.enum(['16:9', '9:16', '1:1']).optional().default('16:9'),
   style: z.enum(['cinematic', 'anime', 'realistic', 'fantasy']).optional().default('cinematic'),
-});
+}).transform((data) => ({
+  ...data,
+  duration: data.durationSeconds ?? data.duration ?? 5,
+}));
 
 export const addCreditsSchema = z.object({
   amount: z.number().int().min(1).max(10000),

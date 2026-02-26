@@ -1,37 +1,59 @@
 /**
  * Credit Guard Middleware
- * - Validates wallet balance >= required seconds
- * - Creates CreditLock before job creation
- * - Prevents API call if credits insufficient
+ * - Validates requested duration <= plan maxDuration
+ * - Validates wallet balance >= required seconds (1 credit = 1 second)
+ * - Attaches requiredSeconds to req for controller
  */
 
 import prisma from '../utils/prisma.js';
-import { getBalance } from '../services/creditService.js';
-import { getCreditCost } from '../services/creditService.js';
-import { InsufficientCreditsError } from '../utils/errors.js';
+import { getBalance, getMaxDuration } from '../services/creditService.js';
+import { InsufficientCreditsError, ValidationError } from '../utils/errors.js';
 
 const LOCK_STATUS = { LOCKED: 'LOCKED', CONSUMED: 'CONSUMED', RELEASED: 'RELEASED' };
 
+const resolveEffectivePlan = async (userId, userPlan) => {
+  if (userPlan && userPlan !== 'FREE') return userPlan;
+  const sub = await prisma.userSubscription.findFirst({
+    where: { userId, status: 'ACTIVE' },
+    include: { plan: true },
+  });
+  if (sub?.plan?.slug) return sub.plan.slug.toUpperCase();
+  return 'FREE';
+};
+
 /**
- * Middleware: validate balance and create credit lock
- * Attaches creditLockId to req for use in controller
+ * Middleware: validate duration + balance, attach requiredSeconds
+ * Reads durationSeconds or duration from req.body (default 5)
  */
 export const creditGuard = async (req, res, next) => {
   try {
     const userId = req.user?.id;
     if (!userId) return next();
 
-    const requiredSeconds = getCreditCost();
+    const requestedSeconds = Math.floor(
+      Number(req.body?.durationSeconds ?? req.body?.duration ?? 5) || 5
+    );
+    if (requestedSeconds < 1 || requestedSeconds > 60) {
+      throw new ValidationError('durationSeconds must be between 1 and 60');
+    }
 
-    const balance = await getBalance(userId);
-    if (balance < requiredSeconds) {
-      throw new InsufficientCreditsError(
-        `Insufficient credits. Required: ${requiredSeconds}s, Available: ${balance}s`
+    const userPlan = req.user?.plan || 'FREE';
+    const effectivePlan = await resolveEffectivePlan(userId, userPlan);
+    const maxDuration = getMaxDuration(effectivePlan);
+    if (requestedSeconds > maxDuration) {
+      throw new ValidationError(
+        `Max duration allowed for your plan is ${maxDuration} seconds`
       );
     }
 
-    // Lock will be created in controller with jobId - we only validate here
-    req.requiredSeconds = requiredSeconds;
+    const balance = await getBalance(userId);
+    if (balance < requestedSeconds) {
+      throw new InsufficientCreditsError(
+        `Insufficient credits. Required: ${requestedSeconds}, available: ${balance}`
+      );
+    }
+
+    req.requiredSeconds = requestedSeconds;
     next();
   } catch (err) {
     next(err);

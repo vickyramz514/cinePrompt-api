@@ -1,12 +1,12 @@
 /**
  * Video controller - generate, history, get by id
  * Flow: Auth → AbuseGuard → CreditGuard → Create Job → Create Lock → Queue → Worker handles deduction
+ * 1 credit = 1 second. requiredSeconds set by creditGuard (validated against plan maxDuration + balance).
  */
 
 import prisma from '../utils/prisma.js';
 import { addVideoJob } from '../queues/videoQueue.js';
 import { getSignedDownloadUrl } from '../services/storageService.js';
-import { getCreditCost } from '../services/creditService.js';
 import { NotFoundError, ValidationError } from '../utils/errors.js';
 import { generateVideoSchema } from '../utils/validators.js';
 import config from '../config/index.js';
@@ -19,12 +19,8 @@ export const generate = async (req, res, next) => {
     }
 
     const userId = req.user.id;
-    const creditCost = req.requiredSeconds ?? getCreditCost();
-
-    const duration = Math.min(
-      parsed.data.duration ?? 5,
-      config.credits.maxVideoSeconds
-    );
+    const creditCost = req.requiredSeconds; // Set by creditGuard after validation
+    const duration = creditCost;
 
     const job = await prisma.$transaction(async (tx) => {
       const created = await tx.videoJob.create({

@@ -25,7 +25,6 @@ import {
 } from '../services/storageService.js';
 import { consumeCreditLock, releaseCreditLock } from '../middlewares/creditGuard.js';
 import { logApiCost, calculateJobCost } from '../services/costService.js';
-import { getCreditCost } from '../services/creditService.js';
 
 const connection = {
   host: config.redis.host,
@@ -37,7 +36,11 @@ const useRunway = () => isRunwayConfigured();
 
 const processJob = async (job) => {
   const { jobId, userId, prompt, metadata } = job.data;
-  const creditCost = getCreditCost();
+  const videoJob = await prisma.videoJob.findUnique({
+    where: { id: jobId },
+    select: { creditsCost: true },
+  });
+  const creditCost = videoJob?.creditsCost ?? 5; // Fallback for legacy jobs
   const provider = useRunway() ? 'runway' : 'replicate';
 
   logger.info('Processing video job', { jobId, userId, provider });

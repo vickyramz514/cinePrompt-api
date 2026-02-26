@@ -217,4 +217,11 @@ export const getBalance = async (userId) => {
   return user?.credits ?? 0;
 };
 
-export const getCreditCost = () => config.credits.costPerVideo;
+/**
+ * Get max video duration (seconds) allowed for a plan
+ * @param {string} plan - UserPlan enum (FREE, STARTER, CREATOR, PRO, ULTRA)
+ */
+export const getMaxDuration = (plan = 'FREE') => {
+  const planConfig = config.planLimits[plan] ?? config.planLimits.FREE;
+  return typeof planConfig === 'object' ? planConfig.maxDuration : 5;
+};

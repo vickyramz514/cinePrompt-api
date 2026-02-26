@@ -3,19 +3,58 @@
  */
 
 import prisma from '../utils/prisma.js';
-import { addCreditsPurchase, getBalance as getCreditBalance } from '../services/creditService.js';
+import {
+  addCreditsPurchase,
+  getBalance as getCreditBalance,
+  getMaxDuration,
+} from '../services/creditService.js';
 import { addCreditsSchema } from '../utils/validators.js';
 import { ValidationError } from '../utils/errors.js';
+
+const resolveEffectivePlan = async (userId, userPlan) => {
+  if (userPlan && userPlan !== 'FREE') return userPlan;
+  const sub = await prisma.userSubscription.findFirst({
+    where: { userId, status: 'ACTIVE' },
+    include: { plan: true },
+  });
+  if (sub?.plan?.slug) return sub.plan.slug.toUpperCase();
+  return 'FREE';
+};
 
 export const getBalance = async (req, res, next) => {
   try {
     const credits = await getCreditBalance(req.user.id);
+    const effectivePlan = await resolveEffectivePlan(req.user.id, req.user?.plan);
+    const maxDuration = getMaxDuration(effectivePlan);
 
     res.json({
       success: true,
       data: {
         credits,
         plan: req.user.plan,
+        maxDuration,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/wallet/limits
+ * Returns credits + maxDuration for UI (slider max, balance display)
+ */
+export const getLimits = async (req, res, next) => {
+  try {
+    const credits = await getCreditBalance(req.user.id);
+    const effectivePlan = await resolveEffectivePlan(req.user.id, req.user?.plan);
+    const maxDuration = getMaxDuration(effectivePlan);
+
+    res.json({
+      success: true,
+      data: {
+        credits,
+        maxDuration,
       },
     });
   } catch (err) {

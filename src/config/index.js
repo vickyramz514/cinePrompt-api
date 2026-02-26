@@ -38,21 +38,34 @@ const config = {
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
   },
 
-  // Credits & Video Limits (1 credit = 1 second)
+  // Credits: 1 credit = 1 second of video
   credits: {
     defaultNewUser: parseInt(process.env.DEFAULT_CREDITS || '30', 10),
-    costPerVideo: parseInt(process.env.CREDIT_COST_PER_VIDEO || '5', 10), // Max 5s video
-    maxVideoSeconds: parseInt(process.env.MAX_VIDEO_SECONDS || '5', 10),
     maxResolution: process.env.MAX_RESOLUTION || '720p',
   },
 
-  // Plan limits: videos per day
+  // Plan limits: max duration per video (seconds) + videos per day
   planLimits: {
-    FREE: parseInt(process.env.PLAN_LIMIT_FREE || '1', 10),
-    STARTER: parseInt(process.env.PLAN_LIMIT_STARTER || '2', 10),
-    CREATOR: parseInt(process.env.PLAN_LIMIT_CREATOR || '4', 10),
-    PRO: parseInt(process.env.PLAN_LIMIT_PRO || '4', 10),
-    ULTRA: parseInt(process.env.PLAN_LIMIT_ULTRA || '6', 10),
+    FREE: {
+      maxDuration: parseInt(process.env.PLAN_FREE_MAX_DURATION || '5', 10),
+      videosPerDay: parseInt(process.env.PLAN_LIMIT_FREE || '1', 10),
+    },
+    STARTER: {
+      maxDuration: parseInt(process.env.PLAN_STARTER_MAX_DURATION || '10', 10),
+      videosPerDay: parseInt(process.env.PLAN_LIMIT_STARTER || '2', 10),
+    },
+    CREATOR: {
+      maxDuration: parseInt(process.env.PLAN_CREATOR_MAX_DURATION || '20', 10),
+      videosPerDay: parseInt(process.env.PLAN_LIMIT_CREATOR || '4', 10),
+    },
+    PRO: {
+      maxDuration: parseInt(process.env.PLAN_PRO_MAX_DURATION || '20', 10),
+      videosPerDay: parseInt(process.env.PLAN_LIMIT_PRO || '4', 10),
+    },
+    ULTRA: {
+      maxDuration: parseInt(process.env.PLAN_ULTRA_MAX_DURATION || '40', 10),
+      videosPerDay: parseInt(process.env.PLAN_LIMIT_ULTRA || '6', 10),
+    },
   },
 
   // Abuse prevention
