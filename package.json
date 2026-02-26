@@ -14,7 +14,10 @@
     "db:migrate:prod": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "db:seed": "node prisma/seed.js"
+    "db:seed": "node prisma/seed.js",
+    "db:seed:plans": "node prisma/seed-subscription-plans.js",
+    "razorpay:create-plans": "node scripts/create-razorpay-plans.js",
+    "razorpay:link-plans": "node scripts/link-razorpay-plans.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

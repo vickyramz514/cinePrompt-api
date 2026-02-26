@@ -30,7 +30,9 @@ export const createSubscriptionCheckout = async (req, res, next) => {
       where: { slug: planSlug, isActive: true },
     });
     if (!plan || !plan.razorpayPlanId) {
-      throw new NotFoundError('Plan not found or not configured for subscriptions');
+      throw new NotFoundError(
+        'Plan not configured for Razorpay. Run `npm run razorpay:create-plans` to create and link Razorpay plans.'
+      );
     }
     if (plan.priceCents <= 0) {
       throw new ValidationError('Free plan cannot be subscribed');

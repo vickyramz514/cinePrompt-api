@@ -28,12 +28,12 @@ export const errorHandler = (err, req, res, next) => {
       code,
       message,
       ...(err.errors && { errors: err.errors }),
+      ...(config.nodeEnv === 'development' && !isAppError && {
+        details: err.message,
+        stack: err.stack,
+      }),
     },
   };
-
-  if (config.nodeEnv === 'development' && !isAppError) {
-    response.error.stack = err.stack;
-  }
 
   res.status(statusCode).json(response);
 };
