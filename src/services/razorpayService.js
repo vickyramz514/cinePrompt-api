@@ -7,6 +7,7 @@ import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import config from '../config/index.js';
 import { logger } from '../utils/logger.js';
+import { AppError } from '../utils/errors.js';
 
 let razorpay = null;
 
@@ -30,21 +31,35 @@ const getRazorpay = () => {
  * @returns {Promise<{subscriptionId, shortUrl}>}
  */
 export const createSubscription = async (planId, userId) => {
-  const rzp = getRazorpay();
-  const subscription = await rzp.subscriptions.create({
-    plan_id: planId,
-    total_count: 12, // 12 months; use 999 for indefinite
-    quantity: 1,
-    customer_notify: 1,
-    notes: {
-      user_id: userId,
-    },
-  });
-  return {
-    subscriptionId: subscription.id,
-    shortUrl: subscription.short_url,
-    status: subscription.status,
-  };
+  try {
+    const rzp = getRazorpay();
+    const subscription = await rzp.subscriptions.create({
+      plan_id: planId,
+      total_count: 12, // 12 months; use 999 for indefinite
+      quantity: 1,
+      customer_notify: 1,
+      notes: {
+        user_id: userId,
+      },
+    });
+    return {
+      subscriptionId: subscription.id,
+      shortUrl: subscription.short_url,
+      status: subscription.status,
+    };
+  } catch (err) {
+    logger.error('Razorpay createSubscription failed', {
+      planId,
+      error: err.message,
+      statusCode: err.statusCode,
+      description: err.description,
+    });
+    const msg =
+      err.description ||
+      err.message ||
+      (err.statusCode === 401 ? 'Invalid Razorpay credentials' : 'Payment provider error');
+    throw new AppError(msg, 502, 'PAYMENT_PROVIDER_ERROR');
+  }
 };
 
 /**
