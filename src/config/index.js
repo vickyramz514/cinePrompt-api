@@ -125,17 +125,22 @@ const config = {
     adminMax: parseInt(process.env.RATE_LIMIT_ADMIN_MAX || '60', 10),
   },
 
-  // CORS - comma-separated for multiple origins (e.g. https://app.vercel.app,http://localhost:3000)
+  // CORS - comma-separated for multiple origins (e.g. https://cineprompt-ai.vercel.app,http://localhost:3000)
+  // When not set in production: allow all origins (set CORS_ORIGIN to restrict)
   cors: {
     origin: (() => {
-      const allowed = process.env.CORS_ORIGIN
+      const envOrigins = process.env.CORS_ORIGIN
         ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
-        : ['http://localhost:3000'];
+        : [];
+      const allowed = envOrigins.length > 0 ? envOrigins : ['http://localhost:3000'];
+      const allowAllInProd = process.env.NODE_ENV === 'production' && envOrigins.length === 0;
+
       return (origin, callback) => {
-        if (!origin || allowed.includes(origin)) {
-          callback(null, origin || allowed[0]);
+        if (!origin) return callback(null, true); // same-origin or no origin
+        if (allowAllInProd || allowed.includes(origin)) {
+          callback(null, origin);
         } else {
-          callback(new Error('Not allowed by CORS'));
+          callback(null, false); // 403, not 500
         }
       };
     })(),
