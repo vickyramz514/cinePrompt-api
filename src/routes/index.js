@@ -11,6 +11,7 @@ import notificationRoutes from './notificationRoutes.js';
 import subscriptionRoutes from './subscriptionRoutes.js';
 import paymentRoutes from './paymentRoutes.js';
 import analyticsRoutes from './analyticsRoutes.js';
+import adminRoutes from './adminRoutes.js';
 
 const router = Router();
 
@@ -66,6 +67,13 @@ router.get('/', (req, res) => {
         topUsers: 'GET /api/analytics/top-users (admin)',
         profitMetrics: 'GET /api/analytics/profit-metrics (admin)',
       },
+      admin: {
+        dashboard: 'GET /api/admin/dashboard (admin)',
+        users: 'GET /api/admin/users (admin)',
+        jobs: 'GET /api/admin/jobs (admin)',
+        payments: 'GET /api/admin/payments (admin)',
+        abuseLogs: 'GET /api/admin/abuse-logs (admin)',
+      },
     },
   });
 });
@@ -78,6 +86,7 @@ router.use('/notifications', notificationRoutes);
 router.use('/subscriptions', subscriptionRoutes);
 router.use('/payment', paymentRoutes);
 router.use('/analytics', analyticsRoutes);
+router.use('/admin', adminRoutes);
 
 router.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

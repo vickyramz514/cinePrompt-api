@@ -1,0 +1,2 @@
+-- Add VideoJob.provider column (RUNWAY | REPLICATE)
+ALTER TABLE "VideoJob" ADD COLUMN IF NOT EXISTS "provider" TEXT NOT NULL DEFAULT 'RUNWAY';

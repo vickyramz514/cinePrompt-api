@@ -57,6 +57,7 @@ export const signup = async (data) => {
       email: true,
       credits: true,
       plan: true,
+      role: true,
       createdAt: true,
     },
   });
@@ -113,6 +114,7 @@ export const login = async (email, password) => {
       email: user.email,
       credits: user.credits,
       plan: user.plan,
+      role: user.role,
     },
     accessToken,
     refreshToken,

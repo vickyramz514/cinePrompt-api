@@ -164,6 +164,7 @@ model User {
   notifications     Notification[]
   notificationPrefs NotificationPreference[]
   auditLogs         AuditLog[]
+  adminAuditLogs    AdminAuditLog[]
 
   @@index([email])
   @@index([provider, providerId])
@@ -634,5 +635,25 @@ model AbuseLog {
 
   @@index([userId])
   @@index([type])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// ADMIN AUDIT LOG - Admin action tracking
+// =============================================================================
+
+model AdminAuditLog {
+  id        String   @id @default(uuid())
+  adminId   String
+  action    String   // credit_update | block_user | unblock_user | cancel_job | plan_override
+  targetType String  // USER | JOB | PAYMENT | CREDIT
+  targetId  String?
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  admin User @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([targetType, targetId])
   @@index([createdAt])
 }

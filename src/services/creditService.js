@@ -168,6 +168,48 @@ export const addCreditsPurchase = async (userId, amount, paymentId = null) => {
 };
 
 /**
+ * Admin credit adjustment (add or deduct)
+ * @param {string} userId - Target user
+ * @param {number} amount - Positive to add, negative to deduct
+ * @param {string} adminId - Admin who performed the action
+ */
+export const adminCreditAdjustment = async (userId, amount, adminId) => {
+  return prisma.$transaction(async (tx) => {
+    const wallet = await getOrCreateWallet(tx, userId);
+    const balanceAfter =
+      amount > 0
+        ? await addCredits(tx, userId, amount)
+        : await deductCredits(tx, userId, Math.abs(amount));
+
+    await tx.creditLedgerEntry.create({
+      data: {
+        walletId: wallet.id,
+        amount,
+        balanceAfter,
+        type: 'ADMIN_ADJUSTMENT',
+        status: 'COMPLETED',
+        referenceId: adminId,
+        referenceType: 'admin',
+      },
+    });
+
+    await tx.transaction.create({
+      data: {
+        userId,
+        amount,
+        credits: Math.abs(amount),
+        status: 'COMPLETED',
+        type: 'ADMIN_ADJUSTMENT',
+        referenceId: adminId,
+        metadata: { adminId },
+      },
+    });
+
+    return balanceAfter;
+  });
+};
+
+/**
  * Add credits from subscription payment (monthly renewal or first charge)
  */
 export const addCreditsSubscription = async (userId, amount, paymentId, subscriptionId) => {

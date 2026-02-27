@@ -16,13 +16,18 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: 'admin@cineprompt.ai' },
-    update: {},
+    update: {
+      role: 'ADMIN',
+      password: hashedPassword,
+      provider: null,
+    },
     create: {
       name: 'Admin User',
       email: 'admin@cineprompt.ai',
       password: hashedPassword,
       credits: 100,
       plan: 'CREATOR',
+      role: 'ADMIN',
     },
   });
 

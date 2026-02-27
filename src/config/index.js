@@ -122,6 +122,7 @@ const config = {
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10),
     max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
+    adminMax: parseInt(process.env.RATE_LIMIT_ADMIN_MAX || '60', 10),
   },
 
   // CORS - comma-separated for multiple origins (e.g. https://app.vercel.app,http://localhost:3000)
