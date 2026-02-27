@@ -17,8 +17,28 @@ import { logger } from './utils/logger.js';
 
 const app = express();
 
+// CORS preflight: handle OPTIONS first so all origins get proper headers (incl. Vercel preview URLs)
+app.options('*', (req, res) => {
+  const origin = req.headers.origin;
+  const envOrigins = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
+    : [];
+  const allowAllInProd = process.env.NODE_ENV === 'production' && envOrigins.length === 0;
+  const isVercelPreview = origin && (origin.endsWith('.vercel.app') || origin.includes('.vercel.app'));
+  const allowed = envOrigins.length > 0 ? envOrigins : ['http://localhost:3000'];
+  const shouldAllow = !origin || allowAllInProd || allowed.includes(origin) || (process.env.NODE_ENV === 'production' && isVercelPreview);
+
+  if (origin && shouldAllow) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.status(204).end();
+});
+
 // CORS header normalization: if Access-Control-Allow-Origin gets a comma-separated value
-// (e.g. from misconfiguration), use only the matching origin to avoid "multiple values" error
 app.use((req, res, next) => {
   const envOrigins = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)

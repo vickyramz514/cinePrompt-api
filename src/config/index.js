@@ -126,7 +126,7 @@ const config = {
   },
 
   // CORS - comma-separated for multiple origins (e.g. https://cineprompt-ai.vercel.app,http://localhost:3000)
-  // When not set in production: allow all origins (set CORS_ORIGIN to restrict)
+  // When not set in production: allow all origins. Vercel preview URLs (*.vercel.app) always allowed in prod.
   cors: {
     origin: (() => {
       const envOrigins = process.env.CORS_ORIGIN
@@ -134,13 +134,15 @@ const config = {
         : [];
       const allowed = envOrigins.length > 0 ? envOrigins : ['http://localhost:3000'];
       const allowAllInProd = process.env.NODE_ENV === 'production' && envOrigins.length === 0;
+      const isVercelPreview = (origin) =>
+        origin && (origin.endsWith('.vercel.app') || origin.includes('.vercel.app'));
 
       return (origin, callback) => {
-        if (!origin) return callback(null, true); // same-origin or no origin
-        if (allowAllInProd || allowed.includes(origin)) {
+        if (!origin) return callback(null, true);
+        if (allowAllInProd || allowed.includes(origin) || (process.env.NODE_ENV === 'production' && isVercelPreview(origin))) {
           callback(null, origin);
         } else {
-          callback(null, false); // 403, not 500
+          callback(null, false);
         }
       };
     })(),
