@@ -76,6 +76,9 @@ export const generate = async (req, res, next) => {
       },
     });
 
+    const { trackEvent } = await import('../services/growthAnalyticsService.js');
+    trackEvent('video_created', userId, { jobId: job.id }).catch(() => {});
+
     res.status(202).json({
       success: true,
       data: {

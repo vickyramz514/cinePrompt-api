@@ -12,6 +12,9 @@ import subscriptionRoutes from './subscriptionRoutes.js';
 import paymentRoutes from './paymentRoutes.js';
 import analyticsRoutes from './analyticsRoutes.js';
 import adminRoutes from './adminRoutes.js';
+import supportRoutes from './supportRoutes.js';
+import referralRoutes from './referralRoutes.js';
+import affiliateRoutes from './affiliateRoutes.js';
 
 const router = Router();
 
@@ -87,6 +90,9 @@ router.use('/subscriptions', subscriptionRoutes);
 router.use('/payment', paymentRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/admin', adminRoutes);
+router.use('/support', supportRoutes);
+router.use('/referral', referralRoutes);
+router.use('/affiliate', affiliateRoutes);
 
 router.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

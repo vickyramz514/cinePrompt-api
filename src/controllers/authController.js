@@ -32,6 +32,8 @@ export const login = async (req, res, next) => {
     }
 
     const result = await authService.login(parsed.data.email, parsed.data.password);
+    const { trackEvent } = await import('../services/growthAnalyticsService.js');
+    trackEvent('login', result.user.id, {}).catch(() => {});
     res.json({
       success: true,
       data: result,

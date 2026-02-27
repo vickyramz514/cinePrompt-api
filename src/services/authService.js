@@ -62,6 +62,23 @@ export const signup = async (data) => {
     },
   });
 
+  if (data.referralCode?.trim()) {
+    const { applyReferralCode } = await import('./referralService.js');
+    try {
+      await applyReferralCode(user.id, data.referralCode.trim());
+      const updated = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { id: true, name: true, email: true, credits: true, plan: true, role: true, createdAt: true },
+      });
+      if (updated) Object.assign(user, updated);
+    } catch {
+      // Ignore referral errors (invalid code, etc.)
+    }
+  }
+
+  const { trackEvent } = await import('./growthAnalyticsService.js');
+  trackEvent('signup', user.id, {}).catch(() => {});
+
   const { accessToken, refreshToken } = createTokens(user.id);
 
   await prisma.refreshToken.create({

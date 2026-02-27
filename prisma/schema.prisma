@@ -149,6 +149,7 @@ model User {
   emailVerified Boolean      @default(false)
   isActive      Boolean      @default(true)
   lastLoginAt   DateTime?
+  referralCode  String?      @unique // For referral/affiliate invites
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
@@ -165,6 +166,11 @@ model User {
   notificationPrefs NotificationPreference[]
   auditLogs         AuditLog[]
   adminAuditLogs    AdminAuditLog[]
+  supportTickets    SupportTicket[]
+  referralsGiven   Referral[]    @relation("Referrer")
+  referralsReceived Referral[]   @relation("Referee")
+  affiliate         Affiliate?
+  growthEvents      GrowthEvent[]
 
   @@index([email])
   @@index([provider, providerId])
@@ -656,4 +662,139 @@ model AdminAuditLog {
   @@index([adminId])
   @@index([targetType, targetId])
   @@index([createdAt])
+}
+
+// =============================================================================
+// CUSTOMER SUPPORT
+// =============================================================================
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+}
+
+enum SupportTicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum SupportMessageSender {
+  USER
+  ADMIN
+}
+
+model SupportTicket {
+  id        String               @id @default(uuid())
+  userId    String
+  subject   String               @db.Text
+  status    SupportTicketStatus   @default(OPEN)
+  priority  SupportTicketPriority @default(MEDIUM)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages SupportMessage[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model SupportMessage {
+  id        String              @id @default(uuid())
+  ticketId  String
+  sender    SupportMessageSender
+  message   String              @db.Text
+  createdAt DateTime           @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// REFERRAL & AFFILIATE
+// =============================================================================
+
+enum ReferralStatus {
+  PENDING
+  COMPLETED
+}
+
+enum AffiliatePayoutStatus {
+  REQUESTED
+  PAID
+}
+
+model Referral {
+  id             String        @id @default(uuid())
+  referrerId     String
+  refereeId      String
+  referralCode   String?
+  rewardCredits  Int           @default(0)
+  rewardCash     Float         @default(0) // INR
+  status         ReferralStatus @default(PENDING)
+  completedAt    DateTime?
+  createdAt      DateTime      @default(now())
+
+  referrer User @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referee  User @relation("Referee", fields: [refereeId], references: [id], onDelete: Cascade)
+
+  @@unique([refereeId])
+  @@index([referrerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Affiliate {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  referralCode   String   @unique
+  commissionRate Float   @default(0.1) // 10%
+  totalEarnings  Float   @default(0)
+  payoutBalance  Float   @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payouts AffiliatePayout[]
+
+  @@index([referralCode])
+}
+
+model AffiliatePayout {
+  id         String               @id @default(uuid())
+  affiliateId String
+  amount     Float
+  status     AffiliatePayoutStatus @default(REQUESTED)
+  paidAt     DateTime?
+  createdAt  DateTime             @default(now())
+
+  affiliate Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  @@index([affiliateId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// GROWTH ANALYTICS
+// =============================================================================
+
+model GrowthEvent {
+  id        String   @id @default(uuid())
+  userId    String?
+  eventType String   // signup | login | video_created | payment_done | subscription_started | etc.
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([eventType])
+  @@index([createdAt])
+  @@index([eventType, createdAt])
 }

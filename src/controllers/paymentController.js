@@ -224,6 +224,12 @@ async function handleSubscriptionCharged(payload) {
     });
   });
 
+  const { recordCommission } = await import('../services/referralService.js');
+  const { trackEvent } = await import('../services/growthAnalyticsService.js');
+  const amountCents = Math.round(amountPaise);
+  recordCommission(userId, amountCents, razorpayPaymentId).catch(() => {});
+  trackEvent('payment_done', userId, { amountCents, subscriptionId: razorpaySubId }).catch(() => {});
+
   logger.info('subscription.charged: credits added', {
     userId,
     credits,
@@ -293,6 +299,9 @@ async function handleSubscriptionActivated(payload) {
     }),
   ]);
 
+  const { trackEvent } = await import('../services/growthAnalyticsService.js');
+  trackEvent('subscription_started', userId, { planSlug: plan.slug }).catch(() => {});
+
   logger.info('subscription.activated', { userId, planId: plan.slug, razorpaySubId });
 }
 
@@ -327,6 +336,11 @@ async function handleSubscriptionCancelled(payload) {
         ? { plan: mapPlanSlugToUserPlan(otherActive.plan.slug), planExpiresAt: otherActive.currentPeriodEnd }
         : { plan: 'FREE', planExpiresAt: null },
     });
+  }
+
+  const { trackEvent } = await import('../services/growthAnalyticsService.js');
+  for (const userId of userIds) {
+    trackEvent('subscription_cancelled', userId, {}).catch(() => {});
   }
 
   logger.info('subscription.cancelled', { razorpaySubId });
