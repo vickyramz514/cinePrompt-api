@@ -35,9 +35,12 @@ const logAbuse = async (userId, type, meta = {}) => {
 };
 
 /**
- * Check daily request rate (max 10/day)
+ * Check daily request rate - ONLY for FREE users (max 10/day as fallback)
+ * Paid users: no per-user daily limit
  */
-export const checkDailyRateLimit = async (userId) => {
+export const checkDailyRateLimit = async (userId, isPaidUser = false) => {
+  if (isPaidUser) return;
+
   const key = `abuse:rate:${userId}:${new Date().toISOString().slice(0, 10)}`;
   const client = getRedis();
   const count = await client.incr(key);
@@ -48,6 +51,27 @@ export const checkDailyRateLimit = async (userId) => {
     throw new AbuseError(
       `Daily limit exceeded. Max ${config.abuse.maxRequestsPerDay} requests per day.`,
       'RATE_LIMIT_EXCEEDED'
+    );
+  }
+};
+
+/**
+ * Check platform-wide daily quota (Runway 50/day)
+ * Applies to ALL users - protects platform from overuse
+ */
+export const checkPlatformDailyQuota = async () => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const count = await prisma.videoJob.count({
+    where: { createdAt: { gte: today } },
+  });
+
+  const limit = config.abuse.platformDailyLimit ?? 50;
+  if (count >= limit) {
+    throw new AbuseError(
+      `Platform daily limit reached. Try again tomorrow.`,
+      'PLATFORM_QUOTA_EXCEEDED'
     );
   }
 };
@@ -96,9 +120,11 @@ export const checkPromptSpam = async (userId, prompt) => {
   }
 };
 
+const PAID_PLANS = ['STARTER', 'CREATOR', 'PRO', 'ULTRA'];
+
 /**
- * Check daily video cap by plan
- * userPlan from User.plan or active subscription
+ * Check daily video cap - ONLY for FREE plan (1 video/day)
+ * Paid plans: NO daily limit - only credit-based restrictions
  */
 export const checkDailyVideoCap = async (userId, userPlan = 'FREE') => {
   let planKey = userPlan || 'FREE';
@@ -111,9 +137,12 @@ export const checkDailyVideoCap = async (userId, userPlan = 'FREE') => {
       planKey = sub.plan.slug.toUpperCase();
     }
   }
-  const planConfig = config.planLimits[planKey] ?? config.planLimits.FREE;
-  const limit = typeof planConfig === 'object' ? planConfig.videosPerDay : planConfig;
 
+  if (PAID_PLANS.includes(planKey)) {
+    return; // Paid users: no daily cap
+  }
+
+  const limit = 1; // FREE: max 1 video/day
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -126,10 +155,12 @@ export const checkDailyVideoCap = async (userId, userPlan = 'FREE') => {
   });
 
   if (count >= limit) {
-    await logAbuse(userId, 'DAILY_CAP', { count, limit, plan: planKey });
+    await logAbuse(userId, 'DAILY_CAP', { count, limit, plan: 'FREE' });
     throw new AbuseError(
-      `Daily limit reached. ${limit} videos/day for your plan.`,
+      `Daily limit reached. Free plan allows 1 video per day.`,
       'DAILY_CAP_EXCEEDED'
     );
   }
 };
+
+export const isPaidPlan = (plan) => PAID_PLANS.includes((plan || 'FREE').toUpperCase());

@@ -73,6 +73,7 @@ const config = {
     maxRequestsPerDay: parseInt(process.env.ABUSE_MAX_REQUESTS_DAY || '10', 10),
     promptSpamWindowMs: parseInt(process.env.PROMPT_SPAM_WINDOW_MS || '60000', 10), // 1 min
     promptSpamThreshold: parseInt(process.env.PROMPT_SPAM_THRESHOLD || '3', 10),
+    platformDailyLimit: parseInt(process.env.PLATFORM_DAILY_VIDEO_LIMIT || '50', 10), // Runway 50/day
   },
 
   // API cost (USD per second) - Runway / Replicate
