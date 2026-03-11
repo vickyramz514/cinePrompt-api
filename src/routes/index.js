@@ -1,9 +1,11 @@
 /**
  * API route aggregation
+ * CinePrompt (auth, video, wallet, etc.) + DataCaptain (stocks, market data)
  */
 
 import { Router } from 'express';
 import authRoutes from './authRoutes.js';
+import datacaptainRoutes from '../datacaptain/routes/index.js';
 import videoRoutes from './videoRoutes.js';
 import walletRoutes from './walletRoutes.js';
 import profileRoutes from './profileRoutes.js';
@@ -93,6 +95,14 @@ router.use('/admin', adminRoutes);
 router.use('/support', supportRoutes);
 router.use('/referral', referralRoutes);
 router.use('/affiliate', affiliateRoutes);
+
+// DataCaptain - market data APIs (x-api-key auth); only for /stocks, /market, /developer, /etf, /options, etc.
+const datacaptainPaths = ['/stocks', '/market', '/search', '/screener', '/indicators', '/ai', '/developer', '/etf', '/options', '/insiders', '/sentiment', '/economy', '/darkpool'];
+router.use((req, res, next) => {
+  const isDataCaptain = datacaptainPaths.some((p) => req.path === p || req.path.startsWith(p + '/'));
+  if (isDataCaptain) return datacaptainRoutes(req, res, next);
+  next();
+});
 
 router.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

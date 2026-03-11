@@ -1,8 +1,9 @@
 /**
  * CinePrompt AI - Production Backend Server
- * Express + Prisma + Redis + BullMQ
+ * Express + Prisma + Redis + BullMQ + DataCaptain (market data + WebSocket)
  */
 
+import http from 'http';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -14,8 +15,11 @@ import * as paymentController from './controllers/paymentController.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { requestLogger } from './middlewares/requestLogger.js';
 import { logger } from './utils/logger.js';
+import { sequelize } from './datacaptain/models/index.js';
+import { attachWebSocket } from './datacaptain/ws/priceStream.js';
 
 const app = express();
+const server = http.createServer(app);
 
 // CORS preflight: handle OPTIONS first so all origins get proper headers (incl. Vercel preview URLs)
 app.options('*', (req, res) => {
@@ -32,7 +36,7 @@ app.options('*', (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key');
   res.setHeader('Access-Control-Max-Age', '86400');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.status(204).end();
@@ -96,6 +100,11 @@ app.use(express.urlencoded({ extended: true }));
 // Logging
 app.use(requestLogger);
 
+// DataCaptain API docs (Swagger)
+import swaggerUi from 'swagger-ui-express';
+import datacaptainSwagger from './datacaptain/config/swagger.js';
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(datacaptainSwagger, { swaggerOptions: { persistAuthorization: true } }));
+
 // Routes
 app.use('/api', routes);
 
@@ -107,10 +116,18 @@ app.use((req, res) => {
 // Error handler
 app.use(errorHandler);
 
-// Start server
-app.listen(config.port, () => {
-  logger.info('Server started', {
-    port: config.port,
-    env: config.nodeEnv,
+// Start server (http for WebSocket support)
+async function start() {
+  try {
+    await sequelize.authenticate();
+    logger.info('DataCaptain database connected');
+  } catch (err) {
+    logger.warn('DataCaptain DB not ready (run datacaptain:db:migrate)', err?.message);
+  }
+  attachWebSocket(server);
+  server.listen(config.port, () => {
+    logger.info('Server started', { port: config.port, env: config.nodeEnv });
+    logger.info('DataCaptain WebSocket: ws://localhost:' + config.port + '/ws');
   });
-});
+}
+start();
