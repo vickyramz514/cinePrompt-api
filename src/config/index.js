@@ -76,8 +76,9 @@ const config = {
     platformDailyLimit: parseInt(process.env.PLATFORM_DAILY_VIDEO_LIMIT || '50', 10), // Runway 50/day
   },
 
-  // API cost (USD per second) - Runway / Replicate
+  // API cost (USD per second) - Minimax / Runway / Replicate
   apiCost: {
+    minimaxPerSecond: parseFloat(process.env.MINIMAX_COST_PER_SECOND || '0.04'),
     runwayPerSecond: parseFloat(process.env.RUNWAY_COST_PER_SECOND || '0.05'),
     replicatePerSecond: parseFloat(process.env.REPLICATE_COST_PER_SECOND || '0.02'),
   },
@@ -96,6 +97,18 @@ const config = {
     timeoutMs: parseInt(process.env.RUNWAY_TIMEOUT_MS || '600000', 10), // 10 min
     pollIntervalMs: parseInt(process.env.RUNWAY_POLL_INTERVAL_MS || '5000', 10),
     maxRetries: parseInt(process.env.RUNWAY_MAX_RETRIES || '3', 10),
+  },
+
+  // Minimax Seedance v2 (CCAPI)
+  minimax: {
+    apiKey: process.env.MINIMAX_API_KEY,
+    baseUrl: process.env.MINIMAX_BASE_URL || 'https://api.ccapi.ai',
+    model: process.env.MINIMAX_VIDEO_MODEL || 'bytedance/seedance-2',
+    pollIntervalMs: parseInt(process.env.MINIMAX_POLL_INTERVAL || '7000', 10),
+    timeoutMs: parseInt(process.env.MINIMAX_TIMEOUT || '600000', 10), // 10 min
+    creditsPerSecond: 5,
+    costPerSecondUsd: 0.04,
+    maxRetries: 2,
   },
 
   // Replicate (fallback)

@@ -24,11 +24,13 @@ export const logApiCost = async (userId, jobId, provider, seconds, cost) => {
 /**
  * Calculate cost for a job: seconds × provider_rate
  */
-export const calculateJobCost = (seconds, provider = 'replicate') => {
+export const calculateJobCost = (seconds, provider = 'minimax') => {
   const rate =
-    provider === 'runway'
-      ? config.apiCost.runwayPerSecond
-      : config.apiCost.replicatePerSecond;
+    provider === 'minimax'
+      ? config.apiCost.minimaxPerSecond
+      : provider === 'runway'
+        ? config.apiCost.runwayPerSecond
+        : config.apiCost.replicatePerSecond;
   return seconds * rate;
 };
 

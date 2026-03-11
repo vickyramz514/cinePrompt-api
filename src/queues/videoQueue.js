@@ -1,6 +1,6 @@
 /**
  * BullMQ video generation queue
- * Timeout: 10 min (Runway), retries: 3, exponential backoff
+ * Minimax: 2 retries, 10 min timeout. Runway/Replicate: 3 retries
  */
 
 import { Queue } from 'bullmq';
@@ -12,9 +12,12 @@ const connection = {
   password: config.redis.password,
 };
 
-const maxRetries = config.runway?.apiSecret
-  ? config.runway.maxRetries
-  : config.replicate.maxRetries;
+const useMinimax = () => !!config.minimax?.apiKey;
+const maxRetries = useMinimax()
+  ? (config.minimax?.maxRetries ?? 2)
+  : config.runway?.apiSecret
+    ? config.runway.maxRetries
+    : config.replicate.maxRetries;
 
 export const videoQueue = new Queue('video-generation', {
   connection,

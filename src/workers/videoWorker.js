@@ -1,13 +1,14 @@
 /**
  * Video generation worker - processes BullMQ jobs
  * Credit flow: Lock created before queue → On success: consume lock + deduct | On failure: release lock
- * Supports Runway (primary) and Replicate (fallback)
+ * Supports Minimax (primary), Runway, Replicate (fallback)
  */
 
 import { Worker } from 'bullmq';
 import config from '../config/index.js';
 import prisma from '../utils/prisma.js';
 import { logger } from '../utils/logger.js';
+import { processMinimaxJob, isConfigured as isMinimaxConfigured } from '../workers/minimaxWorker.js';
 import {
   createVideoPrediction,
   waitForPrediction,
@@ -32,10 +33,16 @@ const connection = {
   password: config.redis.password,
 };
 
-const useRunway = () => isRunwayConfigured();
+const useMinimax = () => isMinimaxConfigured();
+const useRunway = () => !useMinimax() && isRunwayConfigured();
 
 const processJob = async (job) => {
   const { jobId, userId, prompt, metadata } = job.data;
+
+  if (useMinimax()) {
+    return processMinimaxJob({ jobId, userId, prompt, metadata });
+  }
+
   const videoJob = await prisma.videoJob.findUnique({
     where: { id: jobId },
     select: { creditsCost: true },
@@ -178,11 +185,13 @@ const processJob = async (job) => {
   }
 };
 
-const timeoutMs = config.runway?.timeoutMs ?? 600000;
+const timeoutMs = useMinimax()
+  ? (config.minimax?.timeoutMs ?? 600000)
+  : (config.runway?.timeoutMs ?? 600000);
 
 const worker = new Worker('video-generation', processJob, {
   connection,
-  concurrency: useRunway() ? 3 : 2,
+  concurrency: useMinimax() ? 3 : useRunway() ? 3 : 2,
   lockDuration: timeoutMs + 60000,
   stalledInterval: 60000,
   maxStalledCount: 2,

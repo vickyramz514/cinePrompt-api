@@ -1,15 +1,19 @@
 /**
  * Credit Guard Middleware
  * - Validates requested duration <= plan maxDuration
- * - Validates wallet balance >= required seconds (1 credit = 1 second)
- * - Attaches requiredSeconds to req for controller
+ * - Validates wallet balance >= required credits (Minimax: 1 sec = 5 credits)
+ * - Attaches requiredSeconds, requiredCredits to req for controller
  */
 
 import prisma from '../utils/prisma.js';
+import config from '../config/index.js';
 import { getBalance, getMaxDuration } from '../services/creditService.js';
 import { InsufficientCreditsError, ValidationError } from '../utils/errors.js';
 
 const LOCK_STATUS = { LOCKED: 'LOCKED', CONSUMED: 'CONSUMED', RELEASED: 'RELEASED' };
+
+// Minimax: 1 second = 5 credits
+const CREDITS_PER_SECOND = config.minimax?.creditsPerSecond ?? 5;
 
 const resolveEffectivePlan = async (userId, userPlan) => {
   if (userPlan && userPlan !== 'FREE') return userPlan;
@@ -22,7 +26,7 @@ const resolveEffectivePlan = async (userId, userPlan) => {
 };
 
 /**
- * Middleware: validate duration + balance, attach requiredSeconds
+ * Middleware: validate duration + balance, attach requiredSeconds, requiredCredits
  * Reads durationSeconds or duration from req.body (default 5)
  */
 export const creditGuard = async (req, res, next) => {
@@ -46,14 +50,16 @@ export const creditGuard = async (req, res, next) => {
       );
     }
 
+    const requiredCredits = requestedSeconds * CREDITS_PER_SECOND;
     const balance = await getBalance(userId);
-    if (balance < requestedSeconds) {
+    if (balance < requiredCredits) {
       throw new InsufficientCreditsError(
-        `Insufficient credits. Required: ${requestedSeconds}, available: ${balance}`
+        `Insufficient credits. Required: ${requiredCredits}, available: ${balance}`
       );
     }
 
     req.requiredSeconds = requestedSeconds;
+    req.requiredCredits = requiredCredits;
     next();
   } catch (err) {
     next(err);
@@ -62,13 +68,17 @@ export const creditGuard = async (req, res, next) => {
 
 /**
  * Create credit lock (call from controller after job created)
+ * @param {number} seconds - Video duration
+ * @param {number} [credits] - Credits to deduct (default: seconds * CREDITS_PER_SECOND for Minimax)
  */
-export const createCreditLock = async (userId, jobId, seconds) => {
+export const createCreditLock = async (userId, jobId, seconds, credits) => {
+  const creditsToLock = credits ?? seconds * CREDITS_PER_SECOND;
   return prisma.creditLock.create({
     data: {
       userId,
       jobId,
       seconds,
+      credits: creditsToLock,
       status: LOCK_STATUS.LOCKED,
     },
   });
@@ -76,6 +86,7 @@ export const createCreditLock = async (userId, jobId, seconds) => {
 
 /**
  * Consume lock and deduct credits (call from worker on success)
+ * Uses lock.credits if set (Minimax), else lock.seconds (backward compat)
  */
 export const consumeCreditLock = async (jobId) => {
   return prisma.$transaction(async (tx) => {
@@ -86,8 +97,9 @@ export const consumeCreditLock = async (jobId) => {
       return null;
     }
 
+    const amountToDeduct = lock.credits ?? lock.seconds;
     const { deductForVideoJob } = await import('../services/creditService.js');
-    await deductForVideoJob(lock.userId, jobId, lock.seconds);
+    await deductForVideoJob(lock.userId, jobId, amountToDeduct);
 
     await tx.creditLock.update({
       where: { id: lock.id },

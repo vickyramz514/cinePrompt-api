@@ -1,7 +1,7 @@
 /**
  * Video controller - generate, history, get by id
  * Flow: Auth → AbuseGuard → CreditGuard → Create Job → Create Lock → Queue → Worker handles deduction
- * 1 credit = 1 second. requiredSeconds set by creditGuard (validated against plan maxDuration + balance).
+ * Minimax: 1 second = 5 credits. requiredSeconds, requiredCredits set by creditGuard.
  */
 
 import prisma from '../utils/prisma.js';
@@ -19,8 +19,8 @@ export const generate = async (req, res, next) => {
     }
 
     const userId = req.user.id;
-    const creditCost = req.requiredSeconds; // Set by creditGuard after validation
-    const duration = creditCost;
+    const duration = req.requiredSeconds; // Set by creditGuard
+    const creditsCost = req.requiredCredits ?? duration * (config.minimax?.creditsPerSecond ?? 5);
 
     const job = await prisma.$transaction(async (tx) => {
       const created = await tx.videoJob.create({
@@ -28,10 +28,10 @@ export const generate = async (req, res, next) => {
           userId,
           prompt: parsed.data.prompt,
           negativePrompt: parsed.data.negativePrompt ?? null,
-          provider: 'RUNWAY',
+          provider: 'MINIMAX',
           status: 'PENDING',
           creditsUsed: 0,
-          creditsCost: creditCost,
+          creditsCost,
           duration,
           aspectRatio: parsed.data.aspectRatio,
           resolution: config.credits.maxResolution,
@@ -48,7 +48,8 @@ export const generate = async (req, res, next) => {
         data: {
           userId,
           jobId: created.id,
-          seconds: creditCost,
+          seconds: duration,
+          credits: creditsCost,
           status: 'LOCKED',
         },
       });
@@ -86,7 +87,7 @@ export const generate = async (req, res, next) => {
           id: job.id,
           status: job.status,
           progress: job.progress,
-          creditsUsed: creditCost,
+          creditsUsed: creditsCost,
           createdAt: job.createdAt,
         },
       },
