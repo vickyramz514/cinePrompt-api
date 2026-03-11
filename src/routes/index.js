@@ -17,6 +17,8 @@ import adminRoutes from './adminRoutes.js';
 import supportRoutes from './supportRoutes.js';
 import referralRoutes from './referralRoutes.js';
 import affiliateRoutes from './affiliateRoutes.js';
+import apiKeyRoutes from './apiKeyRoutes.js';
+import usageRoutes from './usageRoutes.js';
 
 const router = Router();
 
@@ -49,6 +51,11 @@ router.get('/', (req, res) => {
         get: 'GET /api/profile (auth required)',
         update: 'PATCH /api/profile (auth required)',
       },
+      apiKeys: {
+        me: 'GET /api/api-keys/me (auth required)',
+        regenerate: 'POST /api/api-keys/regenerate (auth required)',
+      },
+      usage: 'GET /api/usage (auth required)',
       notifications: {
         list: 'GET /api/notifications (auth required)',
         markRead: 'PATCH /api/notifications/:id/read (auth required)',
@@ -95,6 +102,8 @@ router.use('/admin', adminRoutes);
 router.use('/support', supportRoutes);
 router.use('/referral', referralRoutes);
 router.use('/affiliate', affiliateRoutes);
+router.use('/api-keys', apiKeyRoutes);
+router.use('/usage', usageRoutes);
 
 // DataCaptain - market data APIs (x-api-key auth); only for /stocks, /market, /developer, /etf, /options, etc.
 const datacaptainPaths = ['/stocks', '/market', '/search', '/screener', '/indicators', '/ai', '/developer', '/etf', '/options', '/insiders', '/sentiment', '/economy', '/darkpool'];
