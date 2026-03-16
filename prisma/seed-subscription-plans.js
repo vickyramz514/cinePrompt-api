@@ -1,15 +1,14 @@
 /**
- * Seed SubscriptionPlan - run after main seed
+ * Seed SubscriptionPlan - Data Captain Stock Data API
  * npx node prisma/seed-subscription-plans.js
  *
- * Plans (per spec):
- * - Free: 30 credits (one-time)
- * - Starter: ₹499/month → 500 credits
- * - Creator: ₹999/month → 500 credits
- * - Ultra: ₹1999/month → 4000 credits
+ * Plans:
+ * - Free: $0, 100 requests/day
+ * - Starter: $15/month, 10,000 requests/day
+ * - Pro: $39/month, 100,000 requests/day
+ * - Enterprise: Custom, high volume
  *
  * Razorpay plan IDs: Create plans in Razorpay Dashboard or via API, then set here.
- * For paid plans, razorpayPlanId must match a plan created in Razorpay.
  */
 
 import { PrismaClient } from '@prisma/client';
@@ -20,72 +19,86 @@ const plans = [
   {
     name: 'Free',
     slug: 'free',
-    description: 'Get started with AI video generation',
+    description: 'Get started with stock market data',
     priceCents: 0,
-    currency: 'INR',
-    credits: 30,
-    creditsPerMonth: 30,
+    currency: 'USD',
+    credits: 100,
+    creditsPerMonth: 100,
     billingCycle: null,
     razorpayPlanId: null,
-    features: ['30 credits (one-time)', '720p output', 'Basic templates'],
+    features: ['100 requests/day', 'Historical stock data', 'ETF data', 'Basic support'],
     isActive: true,
     sortOrder: 0,
   },
   {
-    name: 'Creator',
-    slug: 'creator',
-    description: 'For casual creators',
-    priceCents: 99900, // ₹999
-    currency: 'INR',
-    credits: 500,
-    creditsPerMonth: 500,
+    name: 'Starter',
+    slug: 'starter',
+    description: 'For developers and small projects',
+    priceCents: 1500, // $15
+    currency: 'USD',
+    credits: 10000,
+    creditsPerMonth: 10000,
     billingCycle: 'monthly',
-    razorpayPlanId: null,
-    features: ['500 credits/month', '1080p output', 'Priority rendering'],
+    razorpayPlanId: null, // Set after creating plan in Razorpay: plan_xxx
+    features: ['10,000 requests/day', 'Historical stock & ETF', 'Email support'],
     isActive: true,
     sortOrder: 1,
   },
   {
-    name: 'Starter',
-    slug: 'starter',
-    description: 'For casual creators',
-    priceCents: 49900, // ₹499
-    currency: 'INR',
-    credits: 500,
-    creditsPerMonth: 500,
+    name: 'Pro',
+    slug: 'pro',
+    description: 'For growing applications',
+    priceCents: 3900, // $39
+    currency: 'USD',
+    credits: 100000,
+    creditsPerMonth: 100000,
     billingCycle: 'monthly',
-    razorpayPlanId: null, // Set after creating plan in Razorpay: plan_xxx
-    features: ['500 credits/month', '1080p output', 'All templates'],
+    razorpayPlanId: null,
+    features: ['100,000 requests/day', 'Historical stock & ETF', 'Options & sentiment', 'Priority support'],
     isActive: true,
     sortOrder: 2,
   },
   {
-    name: 'Pro',
-    slug: 'pro',
-    description: 'Deprecated - use Creator or Ultra',
+    name: 'Enterprise',
+    slug: 'enterprise',
+    description: 'Custom high-volume access',
+    priceCents: -100, // -1 → Custom pricing
+    currency: 'USD',
+    credits: -1,
+    creditsPerMonth: -1,
+    billingCycle: null,
+    razorpayPlanId: null,
+    features: ['Custom volume', 'Dedicated support', 'SLA'],
+    isActive: true,
+    sortOrder: 3,
+  },
+  {
+    name: 'Creator',
+    slug: 'creator',
+    description: 'Legacy video plan - deprecated',
     priceCents: 99900,
     currency: 'INR',
-    credits: 1500,
-    creditsPerMonth: 1500,
+    credits: 500,
+    creditsPerMonth: 500,
     billingCycle: 'monthly',
     razorpayPlanId: null,
     features: [],
-    isActive: false, // Removed from subscriptions
-    sortOrder: 99,
+    isActive: false,
+    sortOrder: 98,
   },
   {
     name: 'Ultra',
     slug: 'ultra',
-    description: 'For teams and power users',
-    priceCents: 199900, // ₹1999
+    description: 'Legacy video plan - deprecated',
+    priceCents: 199900,
     currency: 'INR',
     credits: 4000,
     creditsPerMonth: 4000,
     billingCycle: 'monthly',
-    razorpayPlanId: null, // Set after creating plan in Razorpay: plan_xxx
-    features: ['4000 credits/month', '4K output', 'API access'],
-    isActive: true,
-    sortOrder: 3,
+    razorpayPlanId: null,
+    features: [],
+    isActive: false,
+    sortOrder: 99,
   },
 ];
 
