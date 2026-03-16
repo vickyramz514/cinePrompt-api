@@ -857,3 +857,10 @@ model MarketData {
   @@index([asOfDate])
   @@index([instrumentId, asOfDate])
 }
+
+// Encrypted DataCaptain API keys (for /api-keys/me to return full key to returning users)
+model ApiKeySecret {
+  datacaptainKeyId String   @id @map("apiKeyId") // DataCaptain api_keys.id
+  encryptedValue   String   @db.Text
+  createdAt        DateTime @default(now())
+}

@@ -7,6 +7,8 @@
 import crypto from 'crypto';
 import { v4 as uuid } from 'uuid';
 import { ApiUser, ApiKey } from '../datacaptain/models/index.js';
+import prisma from '../utils/prisma.js';
+import { encryptApiKey, decryptApiKey } from '../utils/encryptApiKey.js';
 
 const PREFIX = 'sdata_';
 
@@ -16,6 +18,15 @@ function hashKey(key) {
 
 function generateKey() {
   return `${PREFIX}${crypto.randomBytes(24).toString('hex')}`;
+}
+
+async function storeEncryptedKey(apiKeyId, rawKey) {
+  const encrypted = encryptApiKey(rawKey);
+  await prisma.apiKeySecret.upsert({
+    where: { datacaptainKeyId: apiKeyId },
+    create: { datacaptainKeyId: apiKeyId, encryptedValue: encrypted },
+    update: { encryptedValue: encrypted },
+  });
 }
 
 /**
@@ -49,13 +60,14 @@ export async function getApiKey(req, res, next) {
       const keyHash = hashKey(rawKey);
       const keyPrefix = rawKey.substring(0, 12);
 
-      await ApiKey.create({
+      const created = await ApiKey.create({
         user_id: apiUser.id,
         key_hash: keyHash,
         key_prefix: keyPrefix,
         name: 'Dashboard Key',
         is_active: true,
       });
+      await storeEncryptedKey(created.id, rawKey);
 
       return res.json({
         success: true,
@@ -67,10 +79,23 @@ export async function getApiKey(req, res, next) {
       });
     }
 
+    // Try to retrieve stored full key for existing users
+    const secret = await prisma.apiKeySecret.findUnique({
+      where: { datacaptainKeyId: apiKey.id },
+    }).catch(() => null);
+    let keyToReturn = `${apiKey.key_prefix}...`;
+    if (secret?.encryptedValue) {
+      try {
+        keyToReturn = decryptApiKey(secret.encryptedValue);
+      } catch {
+        // Decrypt failed, fall back to masked
+      }
+    }
+
     res.json({
       success: true,
       data: {
-        key: `${apiKey.key_prefix}...`,
+        key: keyToReturn,
         prefix: apiKey.key_prefix,
         createdAt: apiKey.createdAt?.toISOString() || new Date().toISOString(),
       },
@@ -107,13 +132,14 @@ export async function regenerateApiKey(req, res, next) {
     const keyHash = hashKey(rawKey);
     const keyPrefix = rawKey.substring(0, 12);
 
-    await ApiKey.create({
+    const created = await ApiKey.create({
       user_id: apiUser.id,
       key_hash: keyHash,
       key_prefix: keyPrefix,
       name: 'Dashboard Key',
       is_active: true,
     });
+    await storeEncryptedKey(created.id, rawKey);
 
     res.json({
       success: true,
