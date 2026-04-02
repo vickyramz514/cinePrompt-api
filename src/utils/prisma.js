@@ -13,7 +13,12 @@ const prisma = new PrismaClient({
 
 prisma.$connect().catch((err) => {
   logger.error('Prisma connection failed', { error: err.message });
-  process.exit(1);
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
+  logger.warn(
+    'API will keep running without DB. Set DATABASE_URL to a reachable Postgres, or use npm run dev with a local DB.'
+  );
 });
 
 export default prisma;
