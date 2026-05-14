@@ -1,6 +1,12 @@
 /**
- * Create Razorpay plans and update SubscriptionPlan.razorpayPlanId
- * Run: RAZORPAY_KEY_ID=xxx RAZORPAY_KEY_SECRET=xxx npx node scripts/create-razorpay-plans.js
+ * Create Razorpay Plans for each SubscriptionPlan row that is paid + monthly.
+ * Updates SubscriptionPlan.razorpayPlanId (plan_xxx).
+ *
+ * Run: npm run razorpay:create-plans
+ * Requires: RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET in .env
+ *
+ * Razorpay account must support the currencies in your DB (e.g. USD for Data Captain plans).
+ * If you only have INR enabled, use INR amounts in the DB or create plans in the Razorpay Dashboard.
  */
 
 import { PrismaClient } from '@prisma/client';
@@ -10,12 +16,6 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const prisma = new PrismaClient();
-
-const plans = [
-  { slug: 'starter', name: 'CinePrompt Starter', amountPaise: 49900 },
-  { slug: 'creator', name: 'CinePrompt Creator', amountPaise: 99900 }, // Legacy plan
-  { slug: 'ultra', name: 'CinePrompt Ultra', amountPaise: 199900 },
-];
 
 async function main() {
   const keyId = process.env.RAZORPAY_KEY_ID;
@@ -27,31 +27,49 @@ async function main() {
 
   const rzp = new Razorpay({ key_id: keyId, key_secret: keySecret });
 
-  for (const plan of plans) {
-    const existing = await prisma.subscriptionPlan.findUnique({
-      where: { slug: plan.slug },
-    });
-    if (existing?.razorpayPlanId) {
-      console.log(`Plan ${plan.slug} already has razorpayPlanId: ${existing.razorpayPlanId}`);
+  const dbPlans = await prisma.subscriptionPlan.findMany({
+    where: {
+      isActive: true,
+      billingCycle: 'monthly',
+      priceCents: { gt: 0 },
+    },
+    orderBy: { sortOrder: 'asc' },
+  });
+
+  if (dbPlans.length === 0) {
+    console.log('No paid monthly plans in DB. Run: npm run db:seed:plans');
+    return;
+  }
+
+  for (const plan of dbPlans) {
+    if (plan.razorpayPlanId) {
+      console.log(`Skip ${plan.slug}: already linked → ${plan.razorpayPlanId}`);
       continue;
     }
 
-    const rzpPlan = await rzp.plans.create({
-      period: 'monthly',
-      interval: 1,
-      item: {
-        name: plan.name,
-        amount: plan.amountPaise,
-        currency: 'INR',
-        description: `${plan.name} - monthly subscription`,
-      },
-    });
+    const currency = (plan.currency || 'INR').toUpperCase();
+    const amount = plan.priceCents;
 
-    await prisma.subscriptionPlan.update({
-      where: { slug: plan.slug },
-      data: { razorpayPlanId: rzpPlan.id },
-    });
-    console.log(`Created Razorpay plan for ${plan.slug}: ${rzpPlan.id}`);
+    try {
+      const rzpPlan = await rzp.plans.create({
+        period: 'monthly',
+        interval: 1,
+        item: {
+          name: plan.name,
+          amount,
+          currency,
+          description: `${plan.name} — monthly (${plan.slug})`,
+        },
+      });
+
+      await prisma.subscriptionPlan.update({
+        where: { slug: plan.slug },
+        data: { razorpayPlanId: rzpPlan.id },
+      });
+      console.log(`OK ${plan.slug}: ${rzpPlan.id} (${currency} ${amount})`);
+    } catch (err) {
+      console.error(`Failed ${plan.slug} (${currency} ${amount}):`, err?.error?.description || err?.message || err);
+    }
   }
 }
 

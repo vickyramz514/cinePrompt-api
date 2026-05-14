@@ -1,9 +1,8 @@
 /**
  * Link Razorpay plan IDs to SubscriptionPlan (when plans created manually in Dashboard)
- * Run: RAZORPAY_PLAN_CREATOR=plan_xxx npx node scripts/link-razorpay-plans.js
+ * Run: RAZORPAY_PLAN_STARTER=plan_xxx RAZORPAY_PLAN_PRO=plan_yyy npm run razorpay:link-plans
  *
- * Or set all at once:
- * RAZORPAY_PLAN_STARTER=plan_xxx RAZORPAY_PLAN_CREATOR=plan_yyy RAZORPAY_PLAN_PRO=plan_zzz RAZORPAY_PLAN_ULTRA=plan_aaa npx node scripts/link-razorpay-plans.js
+ * Legacy: RAZORPAY_PLAN_CREATOR, RAZORPAY_PLAN_ULTRA
  */
 
 import { PrismaClient } from '@prisma/client';
@@ -15,6 +14,7 @@ const prisma = new PrismaClient();
 
 const planVars = [
   { slug: 'starter', envKey: 'RAZORPAY_PLAN_STARTER' },
+  { slug: 'pro', envKey: 'RAZORPAY_PLAN_PRO' },
   { slug: 'creator', envKey: 'RAZORPAY_PLAN_CREATOR' },
   { slug: 'ultra', envKey: 'RAZORPAY_PLAN_ULTRA' },
 ];

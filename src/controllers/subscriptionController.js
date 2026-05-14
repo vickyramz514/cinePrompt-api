@@ -3,6 +3,7 @@
  */
 
 import prisma from '../utils/prisma.js';
+import config from '../config/index.js';
 import { createSubscription, cancelSubscription } from '../services/razorpayService.js';
 import { ValidationError, NotFoundError } from '../utils/errors.js';
 
@@ -83,16 +84,22 @@ export const create = async (req, res, next) => {
     });
     if (!plan || !plan.razorpayPlanId) {
       throw new NotFoundError(
-        'Plan not configured for Razorpay. Run `npm run razorpay:create-plans` to create and link Razorpay plans.'
+        'Plan not configured for Razorpay. On the API server, run: npm run razorpay:create-plans (set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET).'
       );
     }
     if (plan.priceCents <= 0) {
       throw new ValidationError('Free plan cannot be subscribed');
     }
 
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { email: true },
+    });
+
     const { subscriptionId, shortUrl } = await createSubscription(
       plan.razorpayPlanId,
-      req.user.id
+      req.user.id,
+      user?.email || null
     );
 
     res.json({
@@ -100,6 +107,8 @@ export const create = async (req, res, next) => {
       data: {
         subscriptionId,
         checkoutUrl: shortUrl,
+        /** Public key — same id used client-side for Standard Checkout + callback_url back to the app. */
+        razorpayKeyId: config.razorpay.keyId || null,
         planId: plan.id,
         planSlug: plan.slug,
       },

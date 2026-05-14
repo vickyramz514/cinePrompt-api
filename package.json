@@ -19,6 +19,7 @@
     "db:seed:market": "node scripts/seed-market-data.js",
     "razorpay:create-plans": "node scripts/create-razorpay-plans.js",
     "razorpay:link-plans": "node scripts/link-razorpay-plans.js",
+    "razorpay:verify-plans": "node scripts/verify-razorpay-plans.js",
     "datacaptain:db:migrate": "node src/datacaptain/utils/runMigrations.js",
     "datacaptain:db:seed": "node src/datacaptain/utils/seedApiKey.js",
     "db:api-key-secrets": "node scripts/create-api-key-secrets-table.js",
