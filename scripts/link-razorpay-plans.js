@@ -6,9 +6,9 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import dotenv from 'dotenv';
+import { loadApiEnv } from '../src/config/loadEnv.js';
 
-dotenv.config();
+loadApiEnv();
 
 const prisma = new PrismaClient();
 

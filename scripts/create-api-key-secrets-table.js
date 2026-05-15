@@ -4,10 +4,8 @@
  * Safe to run multiple times (uses IF NOT EXISTS).
  */
 
+import '../src/config/ensureEnv.js';
 import pg from 'pg';
-import dotenv from 'dotenv';
-
-dotenv.config();
 
 const sql = `
 CREATE TABLE IF NOT EXISTS "ApiKeySecret" (

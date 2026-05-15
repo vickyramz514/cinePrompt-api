@@ -3,9 +3,17 @@
  * All env-based secrets and config values
  */
 
-import dotenv from 'dotenv';
+import { loadApiEnv } from './loadEnv.js';
 
-dotenv.config();
+loadApiEnv();
+
+/** @param {string | undefined} keyId */
+function inferRazorpayKeyMode(keyId) {
+  if (!keyId) return null;
+  if (keyId.startsWith('rzp_live_')) return 'live';
+  if (keyId.startsWith('rzp_test_')) return 'test';
+  return 'unknown';
+}
 
 const config = {
   // Server
@@ -83,12 +91,21 @@ const config = {
     replicatePerSecond: parseFloat(process.env.REPLICATE_COST_PER_SECOND || '0.02'),
   },
 
-  // Razorpay (India)
-  razorpay: {
-    keyId: process.env.RAZORPAY_KEY_ID,
-    keySecret: process.env.RAZORPAY_KEY_SECRET,
-    webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
-  },
+  // Razorpay (India) — mode follows RAZORPAY_KEY_ID prefix; optional RAZORPAY_MODE for explicit checks
+  razorpay: (() => {
+    const keyId = process.env.RAZORPAY_KEY_ID;
+    const raw = process.env.RAZORPAY_MODE?.toLowerCase()?.trim();
+    const declaredMode = raw === 'test' || raw === 'live' ? raw : null;
+    return {
+      keyId,
+      keySecret: process.env.RAZORPAY_KEY_SECRET,
+      webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
+      /** test | live | unknown | null — from key id prefix */
+      mode: inferRazorpayKeyMode(keyId),
+      /** Optional: set to test or live; logs warning at startup if it does not match `mode` */
+      declaredMode,
+    };
+  })(),
 
   // Runway (primary) - SDK reads RUNWAYML_API_SECRET by default
   runway: {

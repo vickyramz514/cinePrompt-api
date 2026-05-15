@@ -15,6 +15,7 @@ import * as paymentController from './controllers/paymentController.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { requestLogger } from './middlewares/requestLogger.js';
 import { logger } from './utils/logger.js';
+import { logRazorpayStartupHints } from './utils/razorpayEnvLog.js';
 import { sequelize } from './datacaptain/models/index.js';
 import { attachWebSocket } from './datacaptain/ws/priceStream.js';
 
@@ -127,6 +128,7 @@ async function start() {
   attachWebSocket(server);
   server.listen(config.port, () => {
     logger.info('Server started', { port: config.port, env: config.nodeEnv });
+    logRazorpayStartupHints();
     logger.info('DataCaptain WebSocket: ws://localhost:' + config.port + '/ws');
   });
 }

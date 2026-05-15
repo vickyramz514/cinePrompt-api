@@ -6,10 +6,10 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import dotenv from 'dotenv';
 import Razorpay from 'razorpay';
+import { loadApiEnv } from '../src/config/loadEnv.js';
 
-dotenv.config();
+loadApiEnv();
 
 const keyId = process.env.RAZORPAY_KEY_ID;
 const keySecret = process.env.RAZORPAY_KEY_SECRET;

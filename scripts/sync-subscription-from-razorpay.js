@@ -6,7 +6,7 @@
  * Run: RAZORPAY_SUB_ID=sub_xxxxx node scripts/sync-subscription-from-razorpay.js
  */
 
-import 'dotenv/config';
+import '../src/config/ensureEnv.js';
 import prisma from '../src/utils/prisma.js';
 import { fetchSubscription } from '../src/services/razorpayService.js';
 

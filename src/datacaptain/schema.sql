@@ -84,7 +84,7 @@ CREATE TABLE api_keys (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES api_users(id),
   key_hash VARCHAR(64) NOT NULL,
-  key_prefix VARCHAR(10) NOT NULL,
+  key_prefix VARCHAR(32) NOT NULL,
   name VARCHAR(100),
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP,

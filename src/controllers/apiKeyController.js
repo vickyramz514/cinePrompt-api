@@ -9,6 +9,7 @@ import { v4 as uuid } from 'uuid';
 import { ApiUser, ApiKey } from '../datacaptain/models/index.js';
 import prisma from '../utils/prisma.js';
 import { encryptApiKey, decryptApiKey } from '../utils/encryptApiKey.js';
+import { logger } from '../utils/logger.js';
 
 const PREFIX = 'sdata_';
 
@@ -101,6 +102,7 @@ export async function getApiKey(req, res, next) {
       },
     });
   } catch (err) {
+    logger.error('api-keys/me failed', { message: err.message, code: err.code });
     next(err);
   }
 }
@@ -150,6 +152,11 @@ export async function regenerateApiKey(req, res, next) {
       },
     });
   } catch (err) {
+    logger.error('api-keys/regenerate failed', {
+      message: err.message,
+      code: err.code,
+      meta: err.meta,
+    });
     next(err);
   }
 }
