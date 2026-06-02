@@ -9,7 +9,20 @@ import { ValidationError, NotFoundError, AppError } from '../utils/errors.js';
 import { resolvePlanId } from '../utils/razorpayPlanResolver.js';
 
 async function assertRazorpayPlanPricing(plan, razorpayPlanId, mode) {
-  const remote = await fetchPlan(razorpayPlanId);
+  let remote;
+  try {
+    remote = await fetchPlan(razorpayPlanId);
+  } catch (err) {
+    throw new AppError(
+      `Unable to validate Razorpay plan ${razorpayPlanId} in ${mode} mode.`,
+      502,
+      'BILLING_PLAN_VALIDATION_FAILED',
+      {
+        hint: `Check Razorpay keys/mode and verify that ${razorpayPlanId} exists in ${mode} dashboard plans.`,
+        details: err?.message,
+      }
+    );
+  }
   const expectedAmount = Number(plan.priceCents);
   const expectedCurrency = String(plan.currency || 'INR').toUpperCase();
   const actualAmount = Number(remote?.item?.amount ?? 0);
