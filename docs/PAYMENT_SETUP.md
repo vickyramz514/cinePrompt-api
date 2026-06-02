@@ -49,16 +49,21 @@ If you get "requested URL was not found", Subscriptions may not be enabled. Cont
 
 1. Razorpay Dashboard → **Subscriptions** → **Plans** → Create Plan
 2. Create monthly plans: Creator (₹999), Starter (₹499), Ultra (₹1999)
-3. Copy each `plan_xxx` ID and run:
+3. Copy each `plan_xxx` ID into:
+   - `scripts/razorpay-plans.test.json` (test mode IDs)
+   - `scripts/razorpay-plans.live.json` (live mode IDs)
+4. Run link script for that mode:
 
 ```bash
-RAZORPAY_PLAN_CREATOR=plan_xxx RAZORPAY_PLAN_STARTER=plan_yyy RAZORPAY_PLAN_ULTRA=plan_zzz npx node scripts/link-razorpay-plans.js
+npm run razorpay:link-plans:test
+# or
+npm run razorpay:link-plans:live
 ```
 
-Or link one at a time, e.g. for Creator only:
+Legacy fallback (env variables) still works:
 
 ```bash
-RAZORPAY_PLAN_CREATOR=plan_xxxxxxxxxxxxx npx node scripts/link-razorpay-plans.js
+RAZORPAY_PLAN_CREATOR=plan_xxxxxxxxxxxxx npm run razorpay:link-plans
 ```
 
 ## API Reference

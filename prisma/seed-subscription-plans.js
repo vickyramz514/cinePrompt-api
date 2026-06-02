@@ -4,9 +4,9 @@
  *
  * Plans:
  * - Free: $0, 50 requests/day
- * - Starter: $15/month, 10,000 requests/day
- * - Pro: $39/month, 100,000 requests/day
- * - Enterprise: Custom, high volume
+ * - Starter: ₹99/month, 1,000 requests/day
+ * - Pro: ₹999/month, 10,000 requests/day
+ * - Ultra: ₹1,999/month, 100,000 requests/day
  *
  * Razorpay plan IDs: Create plans in Razorpay Dashboard or via API, then set here.
  */
@@ -21,9 +21,9 @@ const plans = [
     slug: 'free',
     description: 'Get started with stock market data',
     priceCents: 0,
-    currency: 'USD',
-    credits: 100,
-    creditsPerMonth: 100,
+    currency: 'INR',
+    credits: 50,
+    creditsPerMonth: 50,
     billingCycle: null,
     razorpayPlanId: null,
     features: ['50 requests/day', 'Historical stock data', 'ETF data', 'Basic support'],
@@ -34,13 +34,13 @@ const plans = [
     name: 'Starter',
     slug: 'starter',
     description: 'For developers and small projects',
-    priceCents: 1500, // $15
-    currency: 'USD',
-    credits: 10000,
-    creditsPerMonth: 10000,
+    priceCents: 9900, // ₹99
+    currency: 'INR',
+    credits: 1000,
+    creditsPerMonth: 1000,
     billingCycle: 'monthly',
     razorpayPlanId: null, // Set after creating plan in Razorpay: plan_xxx
-    features: ['10,000 requests/day', 'Historical stock & ETF', 'Email support'],
+    features: ['1,000 requests/day', 'Historical stock & ETF', 'Email support'],
     isActive: true,
     sortOrder: 1,
   },
@@ -48,29 +48,15 @@ const plans = [
     name: 'Pro',
     slug: 'pro',
     description: 'For growing applications',
-    priceCents: 3900, // $39
-    currency: 'USD',
-    credits: 100000,
-    creditsPerMonth: 100000,
+    priceCents: 99900, // ₹999
+    currency: 'INR',
+    credits: 10000,
+    creditsPerMonth: 10000,
     billingCycle: 'monthly',
     razorpayPlanId: null,
-    features: ['100,000 requests/day', 'Historical stock & ETF', 'Options & sentiment', 'Priority support'],
+    features: ['10,000 requests/day', 'Historical stock & ETF', 'Options & sentiment', 'Priority support'],
     isActive: true,
     sortOrder: 2,
-  },
-  {
-    name: 'Enterprise',
-    slug: 'enterprise',
-    description: 'Custom high-volume access',
-    priceCents: -100, // -1 → Custom pricing
-    currency: 'USD',
-    credits: -1,
-    creditsPerMonth: -1,
-    billingCycle: null,
-    razorpayPlanId: null,
-    features: ['Custom volume', 'Dedicated support', 'SLA'],
-    isActive: true,
-    sortOrder: 3,
   },
   {
     name: 'Creator',
@@ -89,16 +75,30 @@ const plans = [
   {
     name: 'Ultra',
     slug: 'ultra',
-    description: 'Legacy video plan - deprecated',
+    description: 'For high-volume production usage',
     priceCents: 199900,
     currency: 'INR',
-    credits: 4000,
-    creditsPerMonth: 4000,
+    credits: 100000,
+    creditsPerMonth: 100000,
     billingCycle: 'monthly',
     razorpayPlanId: null,
-    features: [],
+    features: ['100,000 requests/day', 'Historical stock & ETF', 'All premium APIs', 'Priority support'],
+    isActive: true,
+    sortOrder: 3,
+  },
+  {
+    name: 'Enterprise',
+    slug: 'enterprise',
+    description: 'Custom high-volume access (legacy, hidden)',
+    priceCents: -100, // -1 → Custom pricing
+    currency: 'INR',
+    credits: -1,
+    creditsPerMonth: -1,
+    billingCycle: null,
+    razorpayPlanId: null,
+    features: ['Custom volume', 'Dedicated support', 'SLA'],
     isActive: false,
-    sortOrder: 99,
+    sortOrder: 100,
   },
 ];
 

@@ -8,6 +8,7 @@
 import { PrismaClient } from '@prisma/client';
 import Razorpay from 'razorpay';
 import { loadApiEnv } from '../src/config/loadEnv.js';
+import { resolveRazorpayMode } from './razorpay-plan-map.js';
 
 loadApiEnv();
 
@@ -22,7 +23,9 @@ async function main() {
 
   const modeHint =
     keyId.startsWith('rzp_live_') ? 'live' : keyId.startsWith('rzp_test_') ? 'test' : 'unknown';
+  const mapMode = resolveRazorpayMode();
   console.log(`Using Razorpay keys: mode looks like **${modeHint}** (from key_id prefix)\n`);
+  console.log(`Plan map mode (RAZORPAY_PLAN_MAP_MODE/key inference): ${mapMode}\n`);
 
   const prisma = new PrismaClient();
   const rzp = new Razorpay({ key_id: keyId, key_secret: keySecret });

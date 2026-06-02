@@ -49,9 +49,9 @@ export function isApiPathAllowedForPlan(path, method = "GET", plan) {
 
 export const PLAN_DAILY_LIMITS = {
   free: 50,
-  starter: 10_000,
+  starter: 1_000,
   creator: 10_000,
-  pro: 100_000,
+  pro: 10_000,
   ultra: 100_000,
   enterprise: 1_000_000,
 };
