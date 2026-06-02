@@ -27,6 +27,7 @@ export async function getUsage(req, res, next) {
           monthlyLimit: 10000,
           remainingToday: 1000,
           remainingThisMonth: 10000,
+          plan: apiUser.plan || 'free',
         },
       });
     }
@@ -45,6 +46,7 @@ export async function getUsage(req, res, next) {
           monthlyLimit: 10000,
           remainingToday: 1000,
           remainingThisMonth: 10000,
+          plan: apiUser.plan || 'free',
         },
       });
     }
@@ -65,6 +67,7 @@ export async function getUsage(req, res, next) {
         monthlyLimit,
         remainingToday: stats.requestsRemaining,
         remainingThisMonth,
+        plan: apiUser.plan || stats.plan || 'free',
       },
     });
   } catch (err) {
