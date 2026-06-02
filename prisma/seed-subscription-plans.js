@@ -4,9 +4,9 @@
  *
  * Plans:
  * - Free: $0, 50 requests/day
- * - Starter: ₹99/month, 1,000 requests/day
- * - Pro: ₹999/month, 10,000 requests/day
- * - Ultra: ₹1,999/month, 100,000 requests/day
+ * - Starter: ₹1,500/month, 1,000 requests/day
+ * - Pro: ₹2,500/month, 10,000 requests/day
+ * - Ultra: ₹5,000/month, 100,000 requests/day
  *
  * Razorpay plan IDs: Create plans in Razorpay Dashboard or via API, then set here.
  */
@@ -34,7 +34,7 @@ const plans = [
     name: 'Starter',
     slug: 'starter',
     description: 'For developers and small projects',
-    priceCents: 9900, // ₹99
+    priceCents: 150000, // ₹1,500
     currency: 'INR',
     credits: 1000,
     creditsPerMonth: 1000,
@@ -48,7 +48,7 @@ const plans = [
     name: 'Pro',
     slug: 'pro',
     description: 'For growing applications',
-    priceCents: 99900, // ₹999
+    priceCents: 250000, // ₹2,500
     currency: 'INR',
     credits: 10000,
     creditsPerMonth: 10000,
@@ -76,7 +76,7 @@ const plans = [
     name: 'Ultra',
     slug: 'ultra',
     description: 'For high-volume production usage',
-    priceCents: 199900,
+    priceCents: 500000,
     currency: 'INR',
     credits: 100000,
     creditsPerMonth: 100000,
