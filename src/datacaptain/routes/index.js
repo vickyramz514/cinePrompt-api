@@ -4,6 +4,7 @@
 
 import { Router } from "express";
 import { apiKeyAuth } from "../middlewares/apiKeyAuth.js";
+import { planGate } from "../middlewares/planGate.js";
 import { rateLimiter } from "../middlewares/rateLimiter.js";
 import { cacheMiddleware, cacheKeys } from "../middlewares/cache.js";
 import * as stockController from "../controllers/stockController.js";
@@ -27,6 +28,7 @@ const router = Router();
 
 // All API routes require API key and rate limiting
 router.use(apiKeyAuth);
+router.use(planGate);
 router.use(rateLimiter);
 router.use(usageLogger);
 

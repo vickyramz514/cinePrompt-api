@@ -9,6 +9,7 @@ import { createSubscription } from '../services/razorpayService.js';
 import { addCreditsSubscription } from '../services/creditService.js';
 import { logger } from '../utils/logger.js';
 import { ValidationError, NotFoundError } from '../utils/errors.js';
+import { syncApiUserPlanByEmail } from '../utils/syncApiUserPlan.js';
 
 /** Map SubscriptionPlan slug to UserPlan enum */
 function mapPlanSlugToUserPlan(slug) {
@@ -232,6 +233,11 @@ async function handleSubscriptionCharged(payload) {
     });
   });
 
+  const chargedUser = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+  if (chargedUser?.email) {
+    await syncApiUserPlanByEmail(chargedUser.email, userSub.plan.slug).catch(() => {});
+  }
+
   const { recordCommission } = await import('../services/referralService.js');
   const { trackEvent } = await import('../services/growthAnalyticsService.js');
   const amountCents = Math.round(amountPaise);
@@ -307,6 +313,11 @@ async function handleSubscriptionActivated(payload) {
     }),
   ]);
 
+  const activatedUser = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+  if (activatedUser?.email) {
+    await syncApiUserPlanByEmail(activatedUser.email, plan.slug).catch(() => {});
+  }
+
   const { trackEvent } = await import('../services/growthAnalyticsService.js');
   trackEvent('subscription_started', userId, { planSlug: plan.slug }).catch(() => {});
 
@@ -338,12 +349,17 @@ async function handleSubscriptionCancelled(payload) {
       where: { userId, status: 'ACTIVE', externalId: { not: razorpaySubId } },
       include: { plan: true },
     });
+    const nextSlug = otherActive ? otherActive.plan.slug : 'free';
     await prisma.user.update({
       where: { id: userId },
       data: otherActive
         ? { plan: mapPlanSlugToUserPlan(otherActive.plan.slug), planExpiresAt: otherActive.currentPeriodEnd }
         : { plan: 'FREE', planExpiresAt: null },
     });
+    const cancelledUser = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+    if (cancelledUser?.email) {
+      await syncApiUserPlanByEmail(cancelledUser.email, nextSlug).catch(() => {});
+    }
   }
 
   const { trackEvent } = await import('../services/growthAnalyticsService.js');

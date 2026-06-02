@@ -30,7 +30,7 @@ async function run() {
         email: "dev@datacaptain.com",
         name: "Dev User",
         plan: "free",
-        daily_limit: 1000,
+        daily_limit: 50,
       });
       console.log("Created API user: dev@datacaptain.com");
     }

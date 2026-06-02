@@ -3,7 +3,7 @@
  * npx node prisma/seed-subscription-plans.js
  *
  * Plans:
- * - Free: $0, 100 requests/day
+ * - Free: $0, 50 requests/day
  * - Starter: $15/month, 10,000 requests/day
  * - Pro: $39/month, 100,000 requests/day
  * - Enterprise: Custom, high volume
@@ -26,7 +26,7 @@ const plans = [
     creditsPerMonth: 100,
     billingCycle: null,
     razorpayPlanId: null,
-    features: ['100 requests/day', 'Historical stock data', 'ETF data', 'Basic support'],
+    features: ['50 requests/day', 'Historical stock data', 'ETF data', 'Basic support'],
     isActive: true,
     sortOrder: 0,
   },

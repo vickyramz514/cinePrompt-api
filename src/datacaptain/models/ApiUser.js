@@ -27,7 +27,7 @@ const ApiUser = sequelize.define(
     },
     daily_limit: {
       type: DataTypes.INTEGER,
-      defaultValue: 1000,
+      defaultValue: 50,
     },
   },
   {

@@ -5,6 +5,8 @@
 
 import { ApiUser, ApiKey } from '../datacaptain/models/index.js';
 import * as developerUsageService from '../datacaptain/services/developerUsageService.js';
+import { syncApiUserPlanFromUser } from '../utils/syncApiUserPlan.js';
+import { dailyLimitForPlan } from '../datacaptain/config/planAccess.js';
 
 /**
  * GET /usage - Return usage stats for user's DataCaptain API key
@@ -16,18 +18,22 @@ export async function getUsage(req, res, next) {
       return res.status(400).json({ success: false, error: { message: 'User email required' } });
     }
 
+    await syncApiUserPlanFromUser({ email, plan: req.user?.plan });
+
     const apiUser = await ApiUser.findOne({ where: { email } });
     if (!apiUser) {
+      const planSlug = (req.user?.plan && String(req.user.plan).toLowerCase()) || 'free';
+      const dailyLimit = dailyLimitForPlan(planSlug);
       return res.json({
         success: true,
         data: {
           requestsToday: 0,
           requestsThisMonth: 0,
-          dailyLimit: 1000,
+          dailyLimit,
           monthlyLimit: 10000,
-          remainingToday: 1000,
+          remainingToday: dailyLimit,
           remainingThisMonth: 10000,
-          plan: apiUser.plan || 'free',
+          plan: planSlug,
         },
       });
     }
@@ -37,21 +43,22 @@ export async function getUsage(req, res, next) {
     });
 
     if (!apiKey) {
+      const dailyLimit = apiUser.daily_limit ?? dailyLimitForPlan(apiUser.plan || 'free');
       return res.json({
         success: true,
         data: {
           requestsToday: 0,
           requestsThisMonth: 0,
-          dailyLimit: 1000,
+          dailyLimit,
           monthlyLimit: 10000,
-          remainingToday: 1000,
+          remainingToday: dailyLimit,
           remainingThisMonth: 10000,
           plan: apiUser.plan || 'free',
         },
       });
     }
 
-    const dailyLimit = apiUser.daily_limit ?? 1000;
+    const dailyLimit = apiUser.daily_limit ?? dailyLimitForPlan(apiUser.plan || 'free');
     const stats = await developerUsageService.getUsageStats(apiKey.id, dailyLimit);
 
     const monthlyLimit = 10000;

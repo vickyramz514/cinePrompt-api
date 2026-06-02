@@ -13,6 +13,8 @@ import { createErrorId } from '../utils/errorId.js';
 import { AppError } from '../utils/errors.js';
 import { mapApiKeyError } from '../utils/mapApiKeyError.js';
 import { logger } from '../utils/logger.js';
+import { syncApiUserPlanFromUser } from '../utils/syncApiUserPlan.js';
+import { dailyLimitForPlan } from '../datacaptain/config/planAccess.js';
 
 const PREFIX = 'sdata_';
 
@@ -113,14 +115,19 @@ export async function getApiKey(req, res, next) {
     }
 
     let apiUser = await ApiUser.findOne({ where: { email } });
+    const planSlug = (req.user?.plan && String(req.user.plan).toLowerCase()) || 'free';
+    const dailyLimit = dailyLimitForPlan(planSlug);
     if (!apiUser) {
       apiUser = await ApiUser.create({
         id: uuid(),
         email,
         name: name || email.split('@')[0],
-        plan: 'free',
-        daily_limit: 1000,
+        plan: planSlug,
+        daily_limit: dailyLimit,
       });
+    } else {
+      await syncApiUserPlanFromUser({ email, plan: req.user?.plan });
+      await apiUser.reload();
     }
 
     let apiKey = await ApiKey.findOne({
@@ -175,14 +182,19 @@ export async function regenerateApiKey(req, res, next) {
     }
 
     let apiUser = await ApiUser.findOne({ where: { email } });
+    const planSlug = (req.user?.plan && String(req.user.plan).toLowerCase()) || 'free';
+    const dailyLimit = dailyLimitForPlan(planSlug);
     if (!apiUser) {
       apiUser = await ApiUser.create({
         id: uuid(),
         email,
         name: name || email.split('@')[0],
-        plan: 'free',
-        daily_limit: 1000,
+        plan: planSlug,
+        daily_limit: dailyLimit,
       });
+    } else {
+      await syncApiUserPlanFromUser({ email, plan: req.user?.plan });
+      await apiUser.reload();
     }
 
     await ApiKey.update({ is_active: false }, { where: { user_id: apiUser.id } });

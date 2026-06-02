@@ -74,7 +74,7 @@ CREATE TABLE api_users (
   email VARCHAR(255) NOT NULL UNIQUE,
   name VARCHAR(255),
   plan VARCHAR(20) DEFAULT 'free',
-  daily_limit INTEGER DEFAULT 1000,
+  daily_limit INTEGER DEFAULT 50,
   created_at TIMESTAMP,
   updated_at TIMESTAMP
 );
