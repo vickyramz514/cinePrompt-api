@@ -17,6 +17,19 @@ export function logRazorpayStartupHints() {
     ...(r.declaredMode ? { RAZORPAY_MODE: r.declaredMode } : {}),
   });
 
+  const effectiveMode =
+    (r.declaredMode === 'test' || r.declaredMode === 'live')
+      ? r.declaredMode
+      : (r.mode === 'test' || r.mode === 'live')
+        ? r.mode
+        : config.isProduction
+          ? 'live'
+          : 'test';
+  const planMapFile =
+    effectiveMode === 'live' ? 'scripts/razorpay-plans.live.json' : 'scripts/razorpay-plans.test.json';
+
+  logger.info(`Razorpay plan resolver mode: ${effectiveMode} (using ${planMapFile})`);
+
   if (r.declaredMode && r.mode !== 'unknown' && r.declaredMode !== r.mode) {
     logger.warn(
       `Razorpay: RAZORPAY_MODE=${r.declaredMode} does not match key id (inferred ${r.mode} from RAZORPAY_KEY_ID). Fix env so plan IDs and webhook match the same mode.`

@@ -114,6 +114,14 @@ export const fetchSubscription = async (subscriptionId) => {
 };
 
 /**
+ * Fetch plan details from Razorpay
+ */
+export const fetchPlan = async (planId) => {
+  const rzp = getRazorpay();
+  return rzp.plans.fetch(planId);
+};
+
+/**
  * Verify webhook signature
  * @param {string} body - Raw request body (string)
  * @param {string} signature - x-razorpay-signature header

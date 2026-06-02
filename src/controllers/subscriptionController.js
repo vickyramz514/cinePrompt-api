@@ -4,8 +4,28 @@
 
 import prisma from '../utils/prisma.js';
 import config from '../config/index.js';
-import { createSubscription, cancelSubscription } from '../services/razorpayService.js';
-import { ValidationError, NotFoundError } from '../utils/errors.js';
+import { createSubscription, cancelSubscription, fetchPlan } from '../services/razorpayService.js';
+import { ValidationError, NotFoundError, AppError } from '../utils/errors.js';
+import { resolvePlanId } from '../utils/razorpayPlanResolver.js';
+
+async function assertRazorpayPlanPricing(plan, razorpayPlanId, mode) {
+  const remote = await fetchPlan(razorpayPlanId);
+  const expectedAmount = Number(plan.priceCents);
+  const expectedCurrency = String(plan.currency || 'INR').toUpperCase();
+  const actualAmount = Number(remote?.item?.amount ?? 0);
+  const actualCurrency = String(remote?.item?.currency || '').toUpperCase();
+
+  if (actualAmount !== expectedAmount || actualCurrency !== expectedCurrency) {
+    throw new AppError(
+      `Billing config mismatch for ${plan.slug}: DB=${expectedCurrency} ${expectedAmount} but Razorpay(${mode})=${actualCurrency} ${actualAmount}.`,
+      500,
+      'BILLING_PLAN_MISMATCH',
+      {
+        hint: `Fix scripts/razorpay-plans.${mode}.json or update DB subscriptionPlan (${plan.slug}) to match Razorpay.`,
+      }
+    );
+  }
+}
 
 export const listPlans = async (req, res, next) => {
   try {
@@ -82,14 +102,22 @@ export const create = async (req, res, next) => {
     const plan = await prisma.subscriptionPlan.findFirst({
       where: { slug: planSlug, isActive: true },
     });
-    if (!plan || !plan.razorpayPlanId) {
+    if (!plan) {
       throw new NotFoundError(
-        'Plan not configured for Razorpay. On the API server, run: npm run razorpay:create-plans (set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET).'
+        'Plan not found.'
       );
     }
     if (plan.priceCents <= 0) {
       throw new ValidationError('Free plan cannot be subscribed');
     }
+
+    const { planId: razorpayPlanId, mode } = resolvePlanId(plan.slug, plan.razorpayPlanId);
+    if (!razorpayPlanId) {
+      throw new NotFoundError(
+        `Plan not configured for Razorpay (${mode} mode). Set scripts/razorpay-plans.${mode}.json or link DB plan IDs.`
+      );
+    }
+    await assertRazorpayPlanPricing(plan, razorpayPlanId, mode);
 
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
@@ -97,7 +125,7 @@ export const create = async (req, res, next) => {
     });
 
     const { subscriptionId, shortUrl } = await createSubscription(
-      plan.razorpayPlanId,
+      razorpayPlanId,
       req.user.id,
       user?.email || null
     );
