@@ -1,20 +1,31 @@
 /**
  * Resolve Razorpay plan IDs by runtime mode (test/live).
- * Current behavior: always uses LIVE mapping file.
+ * Default behavior:
+ * - rzp_test_* keys => test map
+ * - rzp_live_* keys => live map
+ * Optional override: RAZORPAY_PLAN_RESOLVER_MODE=test|live
  */
 
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import config from '../config/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 let cache = null;
 
 function inferMode() {
-  // Product decision: always use LIVE plan mapping for checkout.
-  // (If needed later, this can be reverted to key-based inference.)
-  return 'live';
+  const forced = process.env.RAZORPAY_PLAN_RESOLVER_MODE?.trim().toLowerCase();
+  if (forced === 'test' || forced === 'live') return forced;
+
+  if (config.razorpay.declaredMode === 'test' || config.razorpay.declaredMode === 'live') {
+    return config.razorpay.declaredMode;
+  }
+  if (config.razorpay.mode === 'test' || config.razorpay.mode === 'live') {
+    return config.razorpay.mode;
+  }
+  return config.isProduction ? 'live' : 'test';
 }
 
 function loadPlanMap() {
@@ -40,5 +51,9 @@ export function resolvePlanId(planSlug, fallbackPlanId = null) {
     mode,
     planId: mapped || fallbackPlanId || null,
   };
+}
+
+export function getRazorpayPlanResolverMode() {
+  return inferMode();
 }
 

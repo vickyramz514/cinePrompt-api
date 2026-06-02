@@ -4,6 +4,7 @@
 
 import config from '../config/index.js';
 import { logger } from './logger.js';
+import { getRazorpayPlanResolverMode } from './razorpayPlanResolver.js';
 
 export function logRazorpayStartupHints() {
   const r = config.razorpay;
@@ -17,7 +18,10 @@ export function logRazorpayStartupHints() {
     ...(r.declaredMode ? { RAZORPAY_MODE: r.declaredMode } : {}),
   });
 
-  logger.info('Razorpay plan resolver mode: live (using scripts/razorpay-plans.live.json)');
+  const resolverMode = getRazorpayPlanResolverMode();
+  const resolverFile =
+    resolverMode === 'live' ? 'scripts/razorpay-plans.live.json' : 'scripts/razorpay-plans.test.json';
+  logger.info(`Razorpay plan resolver mode: ${resolverMode} (using ${resolverFile})`);
 
   if (r.declaredMode && r.mode !== 'unknown' && r.declaredMode !== r.mode) {
     logger.warn(
