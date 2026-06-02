@@ -9,6 +9,9 @@ import { v4 as uuid } from 'uuid';
 import { ApiUser, ApiKey } from '../datacaptain/models/index.js';
 import prisma from '../utils/prisma.js';
 import { encryptApiKey, decryptApiKey } from '../utils/encryptApiKey.js';
+import { createErrorId } from '../utils/errorId.js';
+import { AppError } from '../utils/errors.js';
+import { mapApiKeyError } from '../utils/mapApiKeyError.js';
 import { logger } from '../utils/logger.js';
 
 const PREFIX = 'sdata_';
@@ -22,12 +25,56 @@ function generateKey() {
 }
 
 async function storeEncryptedKey(apiKeyId, rawKey) {
-  const encrypted = encryptApiKey(rawKey);
-  await prisma.apiKeySecret.upsert({
-    where: { datacaptainKeyId: apiKeyId },
-    create: { datacaptainKeyId: apiKeyId, encryptedValue: encrypted },
-    update: { encryptedValue: encrypted },
+  let encrypted;
+  try {
+    encrypted = encryptApiKey(rawKey);
+  } catch (err) {
+    const mapped = mapApiKeyError(err);
+    if (mapped) throw mapped;
+    throw err;
+  }
+  try {
+    await prisma.apiKeySecret.upsert({
+      where: { datacaptainKeyId: apiKeyId },
+      create: { datacaptainKeyId: apiKeyId, encryptedValue: encrypted },
+      update: { encryptedValue: encrypted },
+    });
+  } catch (err) {
+    const mapped = mapApiKeyError(err);
+    if (mapped) throw mapped;
+    throw err;
+  }
+}
+
+function handleApiKeyRouteError(err, route, next) {
+  const errorId = createErrorId();
+
+  logger.error(`${route} failed`, {
+    errorId,
+    message: err?.message,
+    code: err?.code,
+    name: err?.name,
+    prismaCode: err?.code,
+    stack: err?.stack,
   });
+
+  if (err instanceof AppError) {
+    if (!err.errorId) err.errorId = errorId;
+    return next(err);
+  }
+
+  const mapped = mapApiKeyError(err);
+  if (mapped) {
+    mapped.errorId = errorId;
+    return next(mapped);
+  }
+
+  const fallback = new AppError('Failed to manage API key.', 500, 'API_KEY_ERROR', {
+    errorId,
+    hint: 'Check Railway deploy logs for this errorId. Often: run prisma migrate deploy and set API_KEY_ENCRYPTION_SECRET.',
+    ...(process.env.EXPOSE_API_ERRORS === 'true' && { details: err?.message }),
+  });
+  next(fallback);
 }
 
 async function createActiveKey(apiUser) {
@@ -113,8 +160,7 @@ export async function getApiKey(req, res, next) {
       },
     });
   } catch (err) {
-    logger.error('api-keys/me failed', { message: err.message, code: err.code });
-    next(err);
+    handleApiKeyRouteError(err, 'api-keys/me', next);
   }
 }
 
@@ -152,11 +198,6 @@ export async function regenerateApiKey(req, res, next) {
       },
     });
   } catch (err) {
-    logger.error('api-keys/regenerate failed', {
-      message: err.message,
-      code: err.code,
-      meta: err.meta,
-    });
-    next(err);
+    handleApiKeyRouteError(err, 'api-keys/regenerate', next);
   }
 }

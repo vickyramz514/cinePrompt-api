@@ -3,10 +3,19 @@
  */
 
 export class AppError extends Error {
-  constructor(message, statusCode = 500, code = 'INTERNAL_ERROR') {
+  /**
+   * @param {string} message
+   * @param {number} [statusCode]
+   * @param {string} [code]
+   * @param {{ hint?: string; errorId?: string; details?: string }} [extra]
+   */
+  constructor(message, statusCode = 500, code = 'INTERNAL_ERROR', extra = {}) {
     super(message);
     this.statusCode = statusCode;
     this.code = code;
+    this.hint = extra.hint;
+    this.errorId = extra.errorId;
+    this.details = extra.details;
     Error.captureStackTrace(this, this.constructor);
   }
 }
