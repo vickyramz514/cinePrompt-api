@@ -30,6 +30,31 @@ async function storeEncryptedKey(apiKeyId, rawKey) {
   });
 }
 
+async function createActiveKey(apiUser) {
+  const rawKey = generateKey();
+  const keyHash = hashKey(rawKey);
+  const keyPrefix = rawKey.substring(0, 12);
+
+  const created = await ApiKey.create({
+    user_id: apiUser.id,
+    key_hash: keyHash,
+    key_prefix: keyPrefix,
+    name: 'Dashboard Key',
+    is_active: true,
+  });
+  await storeEncryptedKey(created.id, rawKey);
+
+  return { apiKey: created, rawKey, keyPrefix };
+}
+
+async function resolveFullKey(apiKey) {
+  const secret = await prisma.apiKeySecret
+    .findUnique({ where: { datacaptainKeyId: apiKey.id } })
+    .catch(() => null);
+  if (!secret?.encryptedValue) return null;
+  return decryptApiKey(secret.encryptedValue);
+}
+
 /**
  * GET /api-keys/me - Return user's DataCaptain API key (JWT required)
  */
@@ -51,46 +76,32 @@ export async function getApiKey(req, res, next) {
       });
     }
 
-    const apiKey = await ApiKey.findOne({
+    let apiKey = await ApiKey.findOne({
       where: { user_id: apiUser.id, is_active: true },
       order: [['createdAt', 'DESC']],
     });
 
     if (!apiKey) {
-      const rawKey = generateKey();
-      const keyHash = hashKey(rawKey);
-      const keyPrefix = rawKey.substring(0, 12);
-
-      const created = await ApiKey.create({
-        user_id: apiUser.id,
-        key_hash: keyHash,
-        key_prefix: keyPrefix,
-        name: 'Dashboard Key',
-        is_active: true,
-      });
-      await storeEncryptedKey(created.id, rawKey);
-
+      const { rawKey, keyPrefix, apiKey: created } = await createActiveKey(apiUser);
       return res.json({
         success: true,
         data: {
           key: rawKey,
           prefix: keyPrefix,
-          createdAt: new Date().toISOString(),
+          createdAt: created.createdAt?.toISOString() || new Date().toISOString(),
         },
       });
     }
 
-    // Try to retrieve stored full key for existing users
-    const secret = await prisma.apiKeySecret.findUnique({
-      where: { datacaptainKeyId: apiKey.id },
-    }).catch(() => null);
-    let keyToReturn = `${apiKey.key_prefix}...`;
-    if (secret?.encryptedValue) {
-      try {
-        keyToReturn = decryptApiKey(secret.encryptedValue);
-      } catch {
-        // Decrypt failed, fall back to masked
-      }
+    let keyToReturn = await resolveFullKey(apiKey);
+
+    // Legacy keys created before encrypted storage — issue a new retrievable key
+    if (!keyToReturn) {
+      await ApiKey.update({ is_active: false }, { where: { id: apiKey.id } });
+      const rotated = await createActiveKey(apiUser);
+      keyToReturn = rotated.rawKey;
+      apiKey = rotated.apiKey;
+      logger.info('api-keys/me rotated legacy key without stored secret', { userId: apiUser.id });
     }
 
     res.json({
@@ -130,25 +141,14 @@ export async function regenerateApiKey(req, res, next) {
 
     await ApiKey.update({ is_active: false }, { where: { user_id: apiUser.id } });
 
-    const rawKey = generateKey();
-    const keyHash = hashKey(rawKey);
-    const keyPrefix = rawKey.substring(0, 12);
-
-    const created = await ApiKey.create({
-      user_id: apiUser.id,
-      key_hash: keyHash,
-      key_prefix: keyPrefix,
-      name: 'Dashboard Key',
-      is_active: true,
-    });
-    await storeEncryptedKey(created.id, rawKey);
+    const { rawKey, keyPrefix, apiKey: created } = await createActiveKey(apiUser);
 
     res.json({
       success: true,
       data: {
         key: rawKey,
         prefix: keyPrefix,
-        createdAt: new Date().toISOString(),
+        createdAt: created.createdAt?.toISOString() || new Date().toISOString(),
       },
     });
   } catch (err) {

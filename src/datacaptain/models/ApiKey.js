@@ -22,7 +22,7 @@ const ApiKey = sequelize.define(
       allowNull: false,
     },
     key_prefix: {
-      type: DataTypes.STRING(15),
+      type: DataTypes.STRING(32),
       allowNull: false,
     },
     name: {

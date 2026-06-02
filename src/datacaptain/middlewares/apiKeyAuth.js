@@ -16,8 +16,9 @@ function getPrefix(key) {
 }
 
 export async function apiKeyAuth(req, res, next) {
-  const key = req.headers["x-api-key"];
-  if (!key || typeof key !== "string") {
+  const raw = req.headers["x-api-key"];
+  const key = typeof raw === "string" ? raw.trim() : null;
+  if (!key) {
     return res.status(401).json({
       error: true,
       message: "Missing or invalid API key. Include x-api-key header.",

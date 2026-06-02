@@ -7,9 +7,8 @@ import http from 'http';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-
 import config from './config/index.js';
+import { applyRateLimit } from './middlewares/rateLimiters.js';
 import routes from './routes/index.js';
 import * as paymentController from './controllers/paymentController.js';
 import { errorHandler } from './middlewares/errorHandler.js';
@@ -73,15 +72,8 @@ app.use(
   })
 );
 
-// Rate limiting
-app.use(
-  rateLimit({
-    windowMs: config.rateLimit.windowMs,
-    max: config.rateLimit.max,
-    standardHeaders: true,
-    legacyHeaders: false,
-  })
-);
+// Rate limiting (auth routes have their own budget — see middlewares/rateLimiters.js)
+app.use(applyRateLimit);
 
 // Webhook: raw body required for Razorpay signature (must run before express.json)
 app.use(
