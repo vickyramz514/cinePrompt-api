@@ -11,6 +11,11 @@ import { logger } from '../utils/logger.js';
 import { ValidationError, NotFoundError, AppError } from '../utils/errors.js';
 import { syncApiUserPlanByEmail } from '../utils/syncApiUserPlan.js';
 import { resolvePlanId } from '../utils/razorpayPlanResolver.js';
+import {
+  findSubscriptionPlanByRazorpayId,
+  mapPlanSlugToUserPlan,
+} from '../utils/subscriptionPlanResolver.js';
+import { activateSubscriptionFromRazorpayEntity } from '../services/subscriptionActivationService.js';
 
 async function assertRazorpayPlanPricing(plan, razorpayPlanId, mode) {
   let remote;
@@ -42,12 +47,6 @@ async function assertRazorpayPlanPricing(plan, razorpayPlanId, mode) {
       }
     );
   }
-}
-
-/** Map SubscriptionPlan slug to UserPlan enum */
-function mapPlanSlugToUserPlan(slug) {
-  const m = { free: 'FREE', starter: 'STARTER', creator: 'CREATOR', pro: 'PRO', ultra: 'ULTRA' };
-  return (m[slug?.toLowerCase()] || 'FREE');
 }
 
 /**
@@ -197,11 +196,9 @@ async function handleSubscriptionCharged(payload) {
 
   // If charged arrives before activated, create UserSubscription from payload
   if (!userSub) {
-    const plan = await prisma.subscriptionPlan.findFirst({
-      where: { razorpayPlanId: subscription.plan_id },
-    });
+    const plan = await findSubscriptionPlanByRazorpayId(subscription.plan_id);
     const notes = subscription.notes || {};
-    const userId = notes.user_id;
+    const userId = notes.user_id || notes.userId;
     if (!plan || !userId) {
       logger.warn('subscription.charged: cannot resolve user/plan', {
         planId: subscription.plan_id,
@@ -296,73 +293,14 @@ async function handleSubscriptionActivated(payload) {
   const subscription = payload.subscription?.entity || payload.subscription;
   if (!subscription) return;
 
-  const razorpaySubId = subscription.id;
-  const planId = subscription.plan_id;
-
-  // Find our plan by razorpayPlanId
-  const plan = await prisma.subscriptionPlan.findFirst({
-    where: { razorpayPlanId: planId },
-  });
-  if (!plan) {
-    logger.warn('subscription.activated: plan not found', planId);
+  const result = await activateSubscriptionFromRazorpayEntity(subscription);
+  if (!result.ok) {
+    logger.warn('subscription.activated: not applied', result);
     return;
-  }
-
-  // Get userId from notes (we passed it when creating subscription)
-  const notes = subscription.notes || {};
-  const userId = notes.user_id;
-  if (!userId) {
-    logger.warn('subscription.activated: no user_id in notes');
-    return;
-  }
-
-  const currentStart = subscription.current_start
-    ? new Date(subscription.current_start * 1000)
-    : new Date();
-  const currentEnd = subscription.current_end
-    ? new Date(subscription.current_end * 1000)
-    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
-  await prisma.$transaction([
-    prisma.userSubscription.upsert({
-      where: {
-        userId_planId: { userId, planId: plan.id },
-      },
-      create: {
-        userId,
-        planId: plan.id,
-        status: 'ACTIVE',
-        currentPeriodStart: currentStart,
-        currentPeriodEnd: currentEnd,
-        externalId: razorpaySubId,
-      },
-      update: {
-        status: 'ACTIVE',
-        currentPeriodStart: currentStart,
-        currentPeriodEnd: currentEnd,
-        externalId: razorpaySubId,
-        cancelledAt: null,
-        cancelAtPeriodEnd: false,
-      },
-    }),
-    prisma.user.update({
-      where: { id: userId },
-      data: {
-        plan: mapPlanSlugToUserPlan(plan.slug),
-        planExpiresAt: currentEnd,
-      },
-    }),
-  ]);
-
-  const activatedUser = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
-  if (activatedUser?.email) {
-    await syncApiUserPlanByEmail(activatedUser.email, plan.slug).catch(() => {});
   }
 
   const { trackEvent } = await import('../services/growthAnalyticsService.js');
-  trackEvent('subscription_started', userId, { planSlug: plan.slug }).catch(() => {});
-
-  logger.info('subscription.activated', { userId, planId: plan.slug, razorpaySubId });
+  trackEvent('subscription_started', result.userId, { planSlug: result.planSlug }).catch(() => {});
 }
 
 async function handleSubscriptionCancelled(payload) {

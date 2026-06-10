@@ -8,6 +8,9 @@ import { ValidationError } from '../utils/errors.js';
 
 export const getProfile = async (req, res, next) => {
   try {
+    const { enrichUserWithEffectivePlan } = await import('../utils/userPlanEnrichment.js');
+    const user = await enrichUserWithEffectivePlan(req.user);
+
     const profile = await prisma.userProfile.findUnique({
       where: { userId: req.user.id },
     });
@@ -16,11 +19,11 @@ export const getProfile = async (req, res, next) => {
       success: true,
       data: {
         user: {
-          id: req.user.id,
-          name: req.user.name,
-          email: req.user.email,
-          avatar: req.user.avatar,
-          plan: req.user.plan,
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          avatar: user.avatar,
+          plan: user.plan,
         },
         profile: profile || {
           bio: null,

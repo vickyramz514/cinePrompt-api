@@ -5,8 +5,9 @@
 import prisma from '../utils/prisma.js';
 import config from '../config/index.js';
 import { createSubscription, cancelSubscription, fetchPlan } from '../services/razorpayService.js';
-import { ValidationError, NotFoundError, AppError } from '../utils/errors.js';
+import { ValidationError, NotFoundError, AppError, ForbiddenError } from '../utils/errors.js';
 import { resolvePlanId } from '../utils/razorpayPlanResolver.js';
+import { confirmSubscriptionForUser } from '../services/subscriptionActivationService.js';
 
 async function assertRazorpayPlanPricing(plan, razorpayPlanId, mode) {
   let remote;
@@ -206,23 +207,41 @@ export const cancel = async (req, res, next) => {
  */
 export const getStatus = async (req, res, next) => {
   try {
-    const subscription = await prisma.userSubscription.findFirst({
-      where: { userId: req.user.id },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        plan: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            credits: true,
-            creditsPerMonth: true,
-            priceCents: true,
-            billingCycle: true,
+    const subscription =
+      (await prisma.userSubscription.findFirst({
+        where: { userId: req.user.id, status: 'ACTIVE' },
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          plan: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              credits: true,
+              creditsPerMonth: true,
+              priceCents: true,
+              billingCycle: true,
+            },
           },
         },
-      },
-    });
+      })) ||
+      (await prisma.userSubscription.findFirst({
+        where: { userId: req.user.id },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          plan: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              credits: true,
+              creditsPerMonth: true,
+              priceCents: true,
+              billingCycle: true,
+            },
+          },
+        },
+      }));
 
     res.json({
       success: true,
@@ -238,6 +257,69 @@ export const getStatus = async (req, res, next) => {
               plan: subscription.plan,
             }
           : null,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /api/subscriptions/confirm
+ * Sync plan after Razorpay checkout (backup when webhook plan lookup failed or is delayed).
+ */
+export const confirmCheckout = async (req, res, next) => {
+  try {
+    const subscriptionId =
+      req.body?.subscriptionId || req.body?.razorpaySubscriptionId || req.body?.razorpay_subscription_id;
+    if (!subscriptionId) {
+      throw new ValidationError('subscriptionId is required');
+    }
+
+    const result = await confirmSubscriptionForUser(String(subscriptionId).trim(), req.user.id);
+    if (!result.ok) {
+      if (result.reason === 'user_mismatch') {
+        throw new ForbiddenError('Subscription does not belong to this account');
+      }
+      throw new ValidationError(`Could not confirm subscription: ${result.reason}`);
+    }
+
+    const subscription = await prisma.userSubscription.findFirst({
+      where: { userId: req.user.id, status: 'ACTIVE' },
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        plan: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            credits: true,
+            creditsPerMonth: true,
+            priceCents: true,
+            billingCycle: true,
+          },
+        },
+      },
+    });
+
+    const { enrichUserWithEffectivePlan } = await import('../utils/userPlanEnrichment.js');
+    const user = await enrichUserWithEffectivePlan(req.user);
+
+    res.json({
+      success: true,
+      data: {
+        subscription: subscription
+          ? {
+              id: subscription.id,
+              status: subscription.status,
+              currentPeriodStart: subscription.currentPeriodStart,
+              currentPeriodEnd: subscription.currentPeriodEnd,
+              cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+              externalId: subscription.externalId,
+              plan: subscription.plan,
+            }
+          : null,
+        user,
       },
     });
   } catch (err) {

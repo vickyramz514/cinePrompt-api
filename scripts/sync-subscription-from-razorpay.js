@@ -9,6 +9,10 @@
 import '../src/config/ensureEnv.js';
 import prisma from '../src/utils/prisma.js';
 import { fetchSubscription } from '../src/services/razorpayService.js';
+import {
+  findSubscriptionPlanByRazorpayId,
+  mapPlanSlugToUserPlan,
+} from '../src/utils/subscriptionPlanResolver.js';
 
 async function main() {
   const razorpaySubId = process.env.RAZORPAY_SUB_ID;
@@ -29,9 +33,7 @@ async function main() {
     process.exit(1);
   }
 
-  const plan = await prisma.subscriptionPlan.findFirst({
-    where: { razorpayPlanId: planId },
-  });
+  const plan = await findSubscriptionPlanByRazorpayId(planId);
   if (!plan) {
     console.error('Plan not found for razorpayPlanId:', planId);
     process.exit(1);
@@ -44,8 +46,7 @@ async function main() {
     ? new Date(rzpSub.current_end * 1000)
     : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-  const planMap = { free: 'FREE', starter: 'STARTER', creator: 'CREATOR', pro: 'PRO', ultra: 'ULTRA' };
-  const userPlan = planMap[plan.slug?.toLowerCase()] || 'FREE';
+  const userPlan = mapPlanSlugToUserPlan(plan.slug);
 
   await prisma.$transaction([
     prisma.userSubscription.upsert({

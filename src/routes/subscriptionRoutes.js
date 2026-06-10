@@ -5,6 +5,7 @@
  * GET  /subscriptions/status (auth required)
  * POST /subscriptions/create (auth required)
  * POST /subscriptions/cancel (auth required)
+ * POST /subscriptions/confirm (auth required)
  */
 
 import { Router } from 'express';
@@ -17,6 +18,7 @@ router.get('/plans', subscriptionController.listPlans);
 router.get('/me', authenticate, subscriptionController.getMySubscription);
 router.get('/status', authenticate, subscriptionController.getStatus);
 router.post('/create', authenticate, subscriptionController.create);
+router.post('/confirm', authenticate, subscriptionController.confirmCheckout);
 router.post('/cancel', authenticate, subscriptionController.cancel);
 
 export default router;

@@ -62,9 +62,11 @@ export const refresh = async (req, res, next) => {
 
 export const me = async (req, res, next) => {
   try {
+    const { enrichUserWithEffectivePlan } = await import('../utils/userPlanEnrichment.js');
+    const user = await enrichUserWithEffectivePlan(req.user);
     res.json({
       success: true,
-      data: { user: req.user },
+      data: { user },
     });
   } catch (err) {
     next(err);

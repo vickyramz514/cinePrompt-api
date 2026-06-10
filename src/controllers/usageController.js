@@ -13,16 +13,18 @@ import { dailyLimitForPlan } from '../datacaptain/config/planAccess.js';
  */
 export async function getUsage(req, res, next) {
   try {
-    const { email } = req.user;
+    const { enrichUserWithEffectivePlan } = await import('../utils/userPlanEnrichment.js');
+    const user = await enrichUserWithEffectivePlan(req.user);
+    const { email } = user;
     if (!email) {
       return res.status(400).json({ success: false, error: { message: 'User email required' } });
     }
 
-    await syncApiUserPlanFromUser({ email, plan: req.user?.plan });
+    await syncApiUserPlanFromUser({ email, plan: user?.plan });
 
     const apiUser = await ApiUser.findOne({ where: { email } });
     if (!apiUser) {
-      const planSlug = (req.user?.plan && String(req.user.plan).toLowerCase()) || 'free';
+      const planSlug = (user?.plan && String(user.plan).toLowerCase()) || 'free';
       const dailyLimit = dailyLimitForPlan(planSlug);
       return res.json({
         success: true,
