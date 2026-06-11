@@ -18,6 +18,7 @@ import { logRazorpayStartupHints } from './utils/razorpayEnvLog.js';
 import { runStartupChecks } from './utils/startupChecks.js';
 import { sequelize } from './datacaptain/models/index.js';
 import { attachWebSocket } from './datacaptain/ws/priceStream.js';
+import { isOriginAllowed, parseCorsOriginList } from './utils/corsOrigins.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -25,15 +26,8 @@ const server = http.createServer(app);
 // CORS preflight: handle OPTIONS first so all origins get proper headers (incl. Vercel preview URLs)
 app.options('*', (req, res) => {
   const origin = req.headers.origin;
-  const envOrigins = process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
-    : [];
-  const allowAllInProd = process.env.NODE_ENV === 'production' && envOrigins.length === 0;
-  const isVercelPreview = origin && (origin.endsWith('.vercel.app') || origin.includes('.vercel.app'));
-  const allowed = envOrigins.length > 0 ? envOrigins : ['http://localhost:3000'];
-  const shouldAllow = !origin || allowAllInProd || allowed.includes(origin) || (process.env.NODE_ENV === 'production' && isVercelPreview);
 
-  if (origin && shouldAllow) {
+  if (origin && isOriginAllowed(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
@@ -45,19 +39,17 @@ app.options('*', (req, res) => {
 
 // CORS header normalization: if Access-Control-Allow-Origin gets a comma-separated value
 app.use((req, res, next) => {
-  const envOrigins = process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
-    : [];
-  const allowAllInProd = process.env.NODE_ENV === 'production' && envOrigins.length === 0;
-  const allowed = envOrigins.length > 0 ? envOrigins : ['http://localhost:3000'];
+  const allowed = parseCorsOriginList();
+  const fallback = allowed.length > 0 ? allowed : ['http://localhost:3000'];
 
   const origSetHeader = res.setHeader.bind(res);
   res.setHeader = function (name, value) {
     if (name.toLowerCase() === 'access-control-allow-origin' && typeof value === 'string' && value.includes(',')) {
       const origins = value.split(',').map((o) => o.trim()).filter(Boolean);
-      value = (allowAllInProd && req.headers.origin) || allowed.includes(req.headers.origin)
-        ? req.headers.origin
-        : origins[0] || allowed[0];
+      value =
+        isOriginAllowed(req.headers.origin) && req.headers.origin
+          ? req.headers.origin
+          : origins[0] || fallback[0];
     }
     return origSetHeader(name, value);
   };

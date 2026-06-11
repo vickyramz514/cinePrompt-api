@@ -4,6 +4,7 @@
  */
 
 import { loadApiEnv } from './loadEnv.js';
+import { isOriginAllowed } from '../utils/corsOrigins.js';
 
 loadApiEnv();
 
@@ -156,27 +157,16 @@ const config = {
     adminMax: parseInt(process.env.RATE_LIMIT_ADMIN_MAX || '60', 10),
   },
 
-  // CORS - comma-separated for multiple origins (e.g. https://cineprompt-ai.vercel.app,http://localhost:3000)
-  // When not set in production: allow all origins. Vercel preview URLs (*.vercel.app) always allowed in prod.
+  // CORS - comma-separated (e.g. https://www.datacaptain.in,http://localhost:3000)
+  // Production also allows *.vercel.app previews and *.datacaptain.in (see utils/corsOrigins.js).
   cors: {
-    origin: (() => {
-      const envOrigins = process.env.CORS_ORIGIN
-        ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
-        : [];
-      const allowed = envOrigins.length > 0 ? envOrigins : ['http://localhost:3000'];
-      const allowAllInProd = process.env.NODE_ENV === 'production' && envOrigins.length === 0;
-      const isVercelPreview = (origin) =>
-        origin && (origin.endsWith('.vercel.app') || origin.includes('.vercel.app'));
-
-      return (origin, callback) => {
-        if (!origin) return callback(null, true);
-        if (allowAllInProd || allowed.includes(origin) || (process.env.NODE_ENV === 'production' && isVercelPreview(origin))) {
-          callback(null, origin);
-        } else {
-          callback(null, false);
-        }
-      };
-    })(),
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin)) {
+        callback(null, origin || true);
+      } else {
+        callback(null, false);
+      }
+    },
     credentials: true,
   },
 };
