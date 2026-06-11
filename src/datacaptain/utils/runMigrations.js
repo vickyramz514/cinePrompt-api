@@ -12,7 +12,8 @@ async function run() {
     console.log("Database connected");
 
     // Create tables via Sequelize sync (dev) or use raw SQL for production
-    const { Stock, HistoricalPrice, Company, Dividend, Earnings, ApiUser, ApiKey } = await import("../models/index.js");
+    const { Stock, HistoricalPrice, Company, Dividend, Earnings, StockNews, ApiUser, ApiKey } =
+      await import("../models/index.js");
 
     await sequelize.sync({ alter: true });
     console.log("Tables synced");

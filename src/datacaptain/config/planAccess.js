@@ -12,13 +12,19 @@ export const PAID_PLAN_SLUGS = new Set([
   "enterprise",
 ]);
 
-/** GET paths available on the free plan */
+/** GET paths available on the free plan (exact match) */
 export const FREE_API_PATHS = new Set([
   "/developer/usage",
   "/market/status",
+  "/market/earnings-calendar",
   "/stocks/prices",
   "/etf/list",
 ]);
+
+/** Free plan: path patterns (e.g. per-symbol snapshot for demos) */
+export const FREE_API_PATH_PATTERNS = [
+  /^\/stocks\/[A-Za-z0-9.-]+\/snapshot$/,
+];
 
 export function normalizePlanSlug(plan) {
   return String(plan || "free")
@@ -43,6 +49,7 @@ export function isApiPathAllowedForPlan(path, method = "GET", plan) {
 
   const normalized = path.split("?")[0];
   if (FREE_API_PATHS.has(normalized)) return true;
+  if (FREE_API_PATH_PATTERNS.some((re) => re.test(normalized))) return true;
 
   return false;
 }

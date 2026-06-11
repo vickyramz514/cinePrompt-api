@@ -39,6 +39,10 @@ export const cacheKeys = {
   stockHistory: (req) =>
     `history:${req.params.symbol}:${req.query.startDate}:${req.query.endDate}:${req.query.interval}`,
   stockProfile: (req) => `profile:${req.params.symbol}`,
+  stockSnapshot: (req) => `snapshot:${req.params.symbol}`,
+  stockNews: (req) => `news:${req.params.symbol}:${req.query.limit || 20}`,
+  earningsCalendar: (req) =>
+    `earnings:cal:${req.query.from || ""}:${req.query.to || ""}:${req.query.symbol || ""}:${req.query.limit || 100}`,
   topGainers: () => "market:top-gainers",
   topLosers: () => "market:top-losers",
   mostActive: () => "market:most-active",

@@ -25,6 +25,7 @@
     "razorpay:verify-plans": "node scripts/verify-razorpay-plans.js",
     "datacaptain:db:migrate": "node src/datacaptain/utils/runMigrations.js",
     "datacaptain:db:seed": "node src/datacaptain/utils/seedApiKey.js",
+    "datacaptain:db:seed:snapshot": "node scripts/seed-snapshot-demo-data.js",
     "db:api-key-secrets": "node scripts/create-api-key-secrets-table.js",
     "test": "node --test tests/"
   },

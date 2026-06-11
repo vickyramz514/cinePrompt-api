@@ -35,7 +35,8 @@ npm run datacaptain:db:seed     # Seed API key
 
 ## API Paths (under /api)
 
-- /api/stocks/prices, /api/stocks/:symbol/price, /api/stocks/:symbol/history, etc.
+- /api/stocks/prices, /api/stocks/:symbol/snapshot, /api/stocks/:symbol/news, /api/stocks/:symbol/price, etc.
+- /api/market/earnings-calendar
 - /api/market/status, /api/market/top-gainers, etc.
 - /api/developer/usage
 - /api/etf/list, /api/etf/:symbol

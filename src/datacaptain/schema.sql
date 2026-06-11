@@ -68,6 +68,21 @@ CREATE TABLE earnings (
 CREATE INDEX idx_earnings_symbol ON earnings(symbol);
 CREATE INDEX idx_earnings_report_date ON earnings(report_date);
 
+-- Stock news headlines
+CREATE TABLE stock_news (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  symbol VARCHAR(20) NOT NULL,
+  headline VARCHAR(512) NOT NULL,
+  summary TEXT,
+  source VARCHAR(120),
+  url VARCHAR(1024),
+  published_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP
+);
+CREATE INDEX idx_stock_news_symbol ON stock_news(symbol);
+CREATE INDEX idx_stock_news_published_at ON stock_news(published_at);
+
 -- API users (customers)
 CREATE TABLE api_users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

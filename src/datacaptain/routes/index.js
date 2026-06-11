@@ -17,6 +17,7 @@ import * as developerUsageController from "../controllers/developerUsageControll
 import * as marketStatusController from "../controllers/marketStatusController.js";
 import * as batchPricesController from "../controllers/batchPricesController.js";
 import * as etfController from "../controllers/etfController.js";
+import * as newsController from "../controllers/newsController.js";
 import { usageLogger } from "../middlewares/usageLogger.js";
 import optionsRoutes from "./optionsRoutes.js";
 import insiderRoutes from "./insiderRoutes.js";
@@ -56,6 +57,16 @@ router.get(
   cacheMiddleware(cacheKeys.stockProfile),
   stockController.getProfile
 );
+router.get(
+  "/stocks/:symbol/snapshot",
+  cacheMiddleware(cacheKeys.stockSnapshot),
+  stockController.getSnapshot
+);
+router.get(
+  "/stocks/:symbol/news",
+  cacheMiddleware(cacheKeys.stockNews),
+  newsController.getNews
+);
 router.get("/stocks/:symbol/dividends", stockController.getDividends);
 router.get("/stocks/:symbol/earnings", stockController.getEarnings);
 
@@ -65,6 +76,11 @@ router.get(
   "/market/status",
   cacheMiddleware(cacheKeys.marketStatus),
   marketStatusController.getStatus
+);
+router.get(
+  "/market/earnings-calendar",
+  cacheMiddleware(cacheKeys.earningsCalendar),
+  marketController.getEarningsCalendar
 );
 
 router.get(

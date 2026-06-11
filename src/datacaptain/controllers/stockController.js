@@ -4,6 +4,7 @@
 
 import * as stockService from "../services/stockService.js";
 import * as dividendService from "../services/dividendService.js";
+import * as snapshotService from "../services/snapshotService.js";
 
 export async function getPrice(req, res, next) {
   try {
@@ -67,6 +68,22 @@ export async function getEarnings(req, res, next) {
   try {
     const { symbol } = req.params;
     const data = await dividendService.getEarnings(symbol);
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getSnapshot(req, res, next) {
+  try {
+    const { symbol } = req.params;
+    const data = await snapshotService.getSnapshot(symbol);
+    if (!data) {
+      return res.status(404).json({
+        error: true,
+        message: "Symbol not found. Use GET /api/search?q= to find available symbols.",
+      });
+    }
     res.json(data);
   } catch (err) {
     next(err);
