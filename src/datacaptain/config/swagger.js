@@ -264,12 +264,17 @@ const spec = {
     },
     "/api/etf/list": {
       get: {
-        summary: "Popular ETFs (SPY, QQQ, VTI, DIA, ARKK)",
+        summary: "List ETFs from database (paginated)",
         tags: ["ETF"],
-        parameters: [{ $ref: "#/components/parameters/ApiKeyHeader" }],
+        parameters: [
+          { $ref: "#/components/parameters/ApiKeyHeader" },
+          { name: "limit", in: "query", schema: { type: "integer", default: 100, maximum: 500 } },
+          { name: "offset", in: "query", schema: { type: "integer", default: 0 } },
+          { name: "search", in: "query", schema: { type: "string", description: "Filter by symbol or name" } },
+        ],
         responses: {
           200: {
-            description: "ETF list with prices (cached 60s)",
+            description: "{ data: EtfItem[], total, limit, offset } (cached 60s)",
           },
         },
       },

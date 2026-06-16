@@ -6,7 +6,12 @@ import * as etfService from "../services/etfService.js";
 
 export async function getEtfList(req, res, next) {
   try {
-    const data = await etfService.getEtfList();
+    const { limit, offset, search, q } = req.query;
+    const data = await etfService.getEtfList({
+      limit,
+      offset,
+      search: search || q,
+    });
     res.json(data);
   } catch (err) {
     next(err);

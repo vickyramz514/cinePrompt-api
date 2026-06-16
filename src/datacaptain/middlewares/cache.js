@@ -52,7 +52,8 @@ export const cacheKeys = {
     const s = (req.query.symbols || "").replace(/\s/g, "");
     return s ? `batch:prices:${s}` : null;
   },
-  etfList: () => "etf:list",
+  etfList: (req) =>
+    `etf:list:${req.query.limit || 100}:${req.query.offset || 0}:${(req.query.search || req.query.q || "").toLowerCase()}`,
   etfSymbol: (req) => `etf:${req.params.symbol}`,
   optionsChain: (req) =>
     `options:${req.params.symbol}:${req.query.expirationDate || "all"}:${req.query.limit || 50}`,

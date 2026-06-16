@@ -1,45 +1,80 @@
 /**
  * ETF Data service
- * Popular ETFs and single ETF details
+ * List and detail from stocks + historical_prices tables
  */
 
+import { QueryTypes } from "sequelize";
+import sequelize from "../config/database.js";
 import { Stock, HistoricalPrice } from "../models/index.js";
-import { Op } from "sequelize";
 
-const POPULAR_ETFS = [
-  { symbol: "SPY", name: "SPDR S&P 500 ETF Trust" },
-  { symbol: "QQQ", name: "Invesco QQQ Trust" },
-  { symbol: "VTI", name: "Vanguard Total Stock Market ETF" },
-  { symbol: "DIA", name: "SPDR Dow Jones Industrial Average ETF" },
-  { symbol: "ARKK", name: "ARK Innovation ETF" },
-];
+const POPULAR_SYMBOLS = ["SPY", "QQQ", "VTI", "DIA", "ARKK"];
+const DEFAULT_LIMIT = 100;
+const MAX_LIMIT = 500;
 
-export async function getEtfList() {
-  const symbols = POPULAR_ETFS.map((e) => e.symbol);
+function clampLimit(limit) {
+  const n = parseInt(limit, 10);
+  if (!Number.isFinite(n) || n < 1) return DEFAULT_LIMIT;
+  return Math.min(n, MAX_LIMIT);
+}
 
-  const latestBySymbol = new Map();
-  for (const sym of symbols) {
-    const p = await HistoricalPrice.findOne({
-      where: { symbol: sym },
-      order: [["date", "DESC"]],
-      attributes: ["close"],
-      raw: true,
-    });
-    if (p) latestBySymbol.set(sym, parseFloat(p.close));
+function clampOffset(offset) {
+  const n = parseInt(offset, 10);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return n;
+}
+
+/**
+ * @param {{ limit?: number | string, offset?: number | string, search?: string }} opts
+ */
+export async function getEtfList(opts = {}) {
+  const limit = clampLimit(opts.limit);
+  const offset = clampOffset(opts.offset);
+  const search = (opts.search || "").trim();
+
+  const whereParts = [`s.type = 'ETF'`, `(s.is_active IS NULL OR s.is_active = true)`];
+  const replacements = { limit, offset };
+
+  if (search) {
+    whereParts.push(`(s.symbol ILIKE :search OR s.name ILIKE :search)`);
+    replacements.search = `%${search}%`;
   }
 
-  const stocks = await Stock.findAll({
-    where: { symbol: { [Op.in]: symbols } },
-    attributes: ["symbol", "name"],
-    raw: true,
-  });
-  const stockMap = new Map(stocks.map((s) => [s.symbol, s]));
+  const whereClause = whereParts.join(" AND ");
+  const orderClause = search
+    ? "ORDER BY s.symbol ASC"
+    : `ORDER BY CASE WHEN s.symbol IN ('SPY','QQQ','VTI','DIA','ARKK') THEN 0 ELSE 1 END, s.symbol ASC`;
 
-  return POPULAR_ETFS.map((e) => ({
-    symbol: e.symbol,
-    name: stockMap.get(e.symbol)?.name ?? e.name,
-    price: latestBySymbol.get(e.symbol) ?? null,
-  }));
+  const [countRow] = await sequelize.query(
+    `SELECT COUNT(*)::int AS total FROM stocks s WHERE ${whereClause}`,
+    { replacements, type: QueryTypes.SELECT }
+  );
+
+  const rows = await sequelize.query(
+    `SELECT s.symbol, s.name, s.exchange_code, hp.close AS price
+     FROM stocks s
+     LEFT JOIN LATERAL (
+       SELECT close FROM historical_prices hp2
+       WHERE hp2.symbol = s.symbol
+       ORDER BY hp2.date DESC
+       LIMIT 1
+     ) hp ON true
+     WHERE ${whereClause}
+     ${orderClause}
+     LIMIT :limit OFFSET :offset`,
+    { replacements, type: QueryTypes.SELECT }
+  );
+
+  return {
+    data: rows.map((r) => ({
+      symbol: r.symbol,
+      name: r.name,
+      price: r.price != null ? parseFloat(r.price) : null,
+      exchange: r.exchange_code ?? null,
+    })),
+    total: countRow?.total ?? 0,
+    limit,
+    offset,
+  };
 }
 
 export async function getEtfBySymbol(symbol) {
@@ -59,14 +94,13 @@ export async function getEtfBySymbol(symbol) {
     }),
   ]);
 
-  const staticInfo = POPULAR_ETFS.find((e) => e.symbol === sym);
-
-  if (!stock && !staticInfo) return null;
+  if (!stock) return null;
 
   return {
     symbol: sym,
-    name: stock?.name ?? staticInfo?.name ?? sym,
+    name: stock.name ?? sym,
     type: "ETF",
+    exchange: stock.exchange_code ?? null,
     price: price ? parseFloat(price.close) : null,
     ...(price && {
       date: price.date,
@@ -77,3 +111,5 @@ export async function getEtfBySymbol(symbol) {
     }),
   };
 }
+
+export { POPULAR_SYMBOLS };
