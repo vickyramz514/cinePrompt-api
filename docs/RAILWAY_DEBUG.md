@@ -77,5 +77,15 @@ Redeploy. Responses will include `details` with the raw error message. Remove wh
 1. Railway logs should show:
    - `Startup: API key encryption OK`
    - `Startup: ApiKeySecret table OK`
-2. Call `GET https://YOUR-API/api/health` → `{ "status": "ok" }`
+2. Call `GET https://datacaptain.up.railway.app/api/health` → `{ "status": "ok" }`
 3. Retry `POST /api/api-keys/regenerate` with a valid JWT.
+
+## Razorpay webhook (production)
+
+1. Razorpay Dashboard → **Webhooks** → URL:
+   `https://datacaptain.up.railway.app/api/payment/webhook`
+2. Railway → **Variables** → `RAZORPAY_WEBHOOK_SECRET` must match the secret in Razorpay (same mode as `RAZORPAY_KEY_ID`: test vs live).
+3. Optional: `PUBLIC_API_URL=https://datacaptain.up.railway.app` (logged at startup as the expected webhook base).
+4. After deploy, Railway logs should include:
+   `Razorpay webhook URL (configure in Dashboard → Webhooks)`
+5. Test: complete a subscription checkout; plan should update on `/api/auth/me` within seconds. If not, check Railway logs for `Invalid webhook` or missing secret warnings.

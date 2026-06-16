@@ -4,6 +4,7 @@
  */
 
 import { Router } from 'express';
+import config from '../config/index.js';
 import authRoutes from './authRoutes.js';
 import datacaptainRoutes from '../datacaptain/routes/index.js';
 import videoRoutes from './videoRoutes.js';
@@ -70,7 +71,7 @@ router.get('/', (req, res) => {
       },
       payment: {
         createSubscription: 'POST /api/payment/create-subscription (auth required)',
-        webhook: 'POST /api/payment/webhook (Razorpay)',
+        webhook: `POST ${config.publicApiUrl}/api/payment/webhook (Razorpay)`,
       },
       analytics: {
         overview: 'GET /api/analytics/overview (admin)',

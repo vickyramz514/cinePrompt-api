@@ -19,10 +19,7 @@ Add to `.env`:
 RAZORPAY_KEY_ID=rzp_test_xxxxx
 RAZORPAY_KEY_SECRET=your_key_secret
 RAZORPAY_WEBHOOK_SECRET=your_webhook_secret
-
-# Credits (new users get 30 free)
-DEFAULT_CREDITS=30
-CREDIT_COST_PER_VIDEO=10
+PUBLIC_API_URL=https://datacaptain.up.railway.app
 ```
 
 ## Razorpay Dashboard Setup
@@ -31,9 +28,9 @@ CREDIT_COST_PER_VIDEO=10
 2. Get API keys: Dashboard → Settings → API Keys
 3. Enable Subscriptions: Dashboard → Settings → Configuration
 4. Create webhook: Dashboard → Settings → Webhooks
-   - URL: `https://your-domain.com/api/payment/webhook`
-   - Events: `subscription.charged`, `subscription.activated`, `subscription.cancelled`
-   - Copy the webhook secret to `RAZORPAY_WEBHOOK_SECRET`
+   - URL: `https://datacaptain.up.railway.app/api/payment/webhook`
+   - Events: `subscription.charged`, `subscription.activated`, `subscription.cancelled`, `subscription.completed`
+   - Copy the webhook secret to `RAZORPAY_WEBHOOK_SECRET` on Railway (must match Dashboard)
 
 ## Create Razorpay Plans
 

@@ -46,4 +46,13 @@ export function logRazorpayStartupHints() {
       'Razorpay: RAZORPAY_KEY_ID does not start with rzp_test_ or rzp_live_ — verify key format from dashboard.razorpay.com'
     );
   }
+
+  const webhookUrl = `${config.publicApiUrl}/api/payment/webhook`;
+  logger.info('Razorpay webhook URL (configure in Dashboard → Webhooks)', { webhookUrl });
+
+  if (!r.webhookSecret) {
+    logger.warn(
+      'Razorpay: RAZORPAY_WEBHOOK_SECRET not set — webhooks will fail signature verification until configured'
+    );
+  }
 }
