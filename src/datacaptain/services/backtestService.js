@@ -24,9 +24,15 @@ function yearsBetween(start, end) {
 
 async function assertSymbol(symbol) {
   const sym = symbol?.toUpperCase();
-  const row = await Stock.findByPk(sym, { attributes: ["symbol", "name", "type"], raw: true });
+  const row = await Stock.findOne({
+    where: { symbol: sym, type: "ETF" },
+    attributes: ["symbol", "name", "type"],
+    raw: true,
+  });
   if (!row) {
-    throw new NotFoundError(`Symbol not found: ${sym}`);
+    throw new NotFoundError(
+      `ETF not found: ${sym}. Data Captain currently supports ETF symbols only.`
+    );
   }
   return row;
 }

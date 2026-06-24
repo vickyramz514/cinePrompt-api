@@ -16,15 +16,12 @@ export const PAID_PLAN_SLUGS = new Set([
 export const FREE_API_PATHS = new Set([
   "/developer/usage",
   "/market/status",
-  "/market/earnings-calendar",
   "/stocks/prices",
   "/etf/list",
 ]);
 
-/** Free plan: path patterns (e.g. per-symbol snapshot for demos) */
-export const FREE_API_PATH_PATTERNS = [
-  /^\/stocks\/[A-Za-z0-9.-]+\/snapshot$/,
-];
+/** Free plan: path patterns */
+export const FREE_API_PATH_PATTERNS = [];
 
 export function normalizePlanSlug(plan) {
   return String(plan || "free")

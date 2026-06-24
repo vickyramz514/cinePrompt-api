@@ -7,7 +7,7 @@ const spec = {
   info: {
     title: "DataCaptain API",
     version: "1.0.0",
-    description: "US Stock Market Data API for developers and fintech companies. WebSocket: ws://host:port/ws",
+    description: "US ETF Data API for developers and fintech companies. WebSocket: ws://host:port/ws",
   },
   servers: [{ url: "/", description: "API server" }],
   components: {

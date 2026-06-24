@@ -4,17 +4,34 @@
 
 import { Stock, HistoricalPrice, Company } from "../models/index.js";
 import { Op } from "sequelize";
+import { NotFoundError } from "../../utils/errors.js";
+
+async function assertEtfSymbol(symbol) {
+  const sym = symbol?.toUpperCase();
+  const row = await Stock.findOne({
+    where: { symbol: sym, type: "ETF" },
+    attributes: ["symbol"],
+    raw: true,
+  });
+  if (!row) {
+    throw new NotFoundError(
+      `ETF not found: ${sym}. Data Captain currently supports ETF symbols only.`
+    );
+  }
+  return sym;
+}
 
 export async function getLatestPrice(symbol) {
+  const sym = await assertEtfSymbol(symbol);
   const price = await HistoricalPrice.findOne({
-    where: { symbol: symbol.toUpperCase() },
+    where: { symbol: sym },
     order: [["date", "DESC"]],
     raw: true,
   });
   if (!price) return null;
 
   const prev = await HistoricalPrice.findOne({
-    where: { symbol: symbol.toUpperCase() },
+    where: { symbol: sym },
     order: [["date", "DESC"]],
     offset: 1,
     raw: true,
@@ -33,7 +50,8 @@ export async function getLatestPrice(symbol) {
 }
 
 export async function getHistory(symbol, startDate, endDate, interval = "1d") {
-  const where = { symbol: symbol.toUpperCase() };
+  const sym = await assertEtfSymbol(symbol);
+  const where = { symbol: sym };
   if (startDate || endDate) {
     where.date = {};
     if (startDate) where.date[Op.gte] = startDate;
@@ -64,8 +82,9 @@ export async function getHistory(symbol, startDate, endDate, interval = "1d") {
 }
 
 export async function getCandles(symbol, interval = "1d", limit = 100) {
+  const sym = await assertEtfSymbol(symbol);
   const rows = await HistoricalPrice.findAll({
-    where: { symbol: symbol.toUpperCase() },
+    where: { symbol: sym },
     order: [["date", "DESC"]],
     limit: Math.min(limit, 500),
     raw: true,
@@ -102,6 +121,7 @@ export async function searchStocks(q) {
   const term = `%${q}%`;
   const stocks = await Stock.findAll({
     where: {
+      type: "ETF",
       [Op.or]: [{ symbol: { [Op.iLike]: term } }, { name: { [Op.iLike]: term } }],
     },
     limit: 20,

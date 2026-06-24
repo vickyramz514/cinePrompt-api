@@ -1,10 +1,12 @@
 /**
- * Batch Stock Prices service
- * Returns latest price for multiple symbols (max 50)
+ * Batch ETF Prices service
+ * Returns latest price for multiple ETF symbols (max 50)
  */
 
 import sequelize from "../config/database.js";
 import { QueryTypes } from "sequelize";
+import { Stock } from "../models/index.js";
+import { Op } from "sequelize";
 
 const MAX_SYMBOLS = 50;
 
@@ -23,9 +25,17 @@ export async function getBatchPrices(symbolsParam) {
     throw new Error(`Maximum ${MAX_SYMBOLS} symbols allowed`);
   }
 
-  const placeholders = symbols.map((_, i) => `:s${i}`).join(", ");
+  const etfRows = await Stock.findAll({
+    where: { symbol: { [Op.in]: symbols }, type: "ETF" },
+    attributes: ["symbol"],
+    raw: true,
+  });
+  const etfSymbols = etfRows.map((r) => r.symbol);
+  if (etfSymbols.length === 0) return [];
+
+  const placeholders = etfSymbols.map((_, i) => `:s${i}`).join(", ");
   const replacements = {};
-  symbols.forEach((s, i) => {
+  etfSymbols.forEach((s, i) => {
     replacements[`s${i}`] = s;
   });
 

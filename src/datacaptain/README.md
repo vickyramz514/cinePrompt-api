@@ -1,6 +1,6 @@
 # DataCaptain Module
 
-US Stock Market Data API - merged into CinePrompt API server.
+US ETF Data API - merged into CinePrompt API server.
 
 ## Structure (maintainable separately)
 
