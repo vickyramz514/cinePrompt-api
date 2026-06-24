@@ -59,6 +59,25 @@ export async function getEtfScreener(req, res, next) {
   }
 }
 
+export async function getEtfRankings(req, res, next) {
+  try {
+    const plan = normalizePlanSlug(req.apiUser?.plan);
+    const data = await etfMetricsService.rankEtfs(
+      {
+        category: req.query.category,
+        period: req.query.period,
+        assetClass: req.query.assetClass,
+        limit: req.query.limit,
+        offset: req.query.offset,
+      },
+      plan
+    );
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function getEtfBySymbol(req, res, next) {
   try {
     const { symbol } = req.params;

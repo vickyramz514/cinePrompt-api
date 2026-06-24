@@ -137,6 +137,11 @@ router.get(
   etfController.getEtfScreener
 );
 router.get(
+  "/etf/rankings",
+  cacheMiddleware(cacheKeys.etfRankings),
+  etfController.getEtfRankings
+);
+router.get(
   "/etf/list",
   cacheMiddleware(cacheKeys.etfList),
   etfController.getEtfList

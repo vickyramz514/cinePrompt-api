@@ -59,6 +59,8 @@ export const cacheKeys = {
   etfHeatmapBaskets: () => "etf:heatmap:baskets",
   etfScreener: (req) =>
     `etf:screener:${req.query.period || "1y"}:${req.query.returnMin || ""}:${req.query.dividendYieldMin || ""}:${req.query.assetClass || ""}:${req.query.sort || "return"}:${req.query.limit || 50}:${req.query.offset || 0}`,
+  etfRankings: (req) =>
+    `etf:rankings:${req.query.category || "return"}:${req.query.period || "1y"}:${req.query.assetClass || ""}:${req.query.limit || 20}:${req.query.offset || 0}`,
   etfSymbol: (req) => `etf:${req.params.symbol}`,
   optionsChain: (req) =>
     `options:${req.params.symbol}:${req.query.expirationDate || "all"}:${req.query.limit || 50}`,

@@ -21,6 +21,7 @@ export const FREE_API_PATHS = new Set([
   "/etf/heatmap",
   "/etf/heatmap/baskets",
   "/etf/screener",
+  "/etf/rankings",
 ]);
 
 /** Free plan: path patterns */

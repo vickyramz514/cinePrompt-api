@@ -395,3 +395,102 @@ export function listHeatmapBaskets() {
     symbols: basket.symbols,
   }));
 }
+
+const RANKING_CATEGORIES = new Set(["return", "yield", "volatility"]);
+
+/**
+ * Leaderboard rankings — top ETFs by return, yield, or lowest volatility.
+ */
+export async function rankEtfs(filters, plan) {
+  const {
+    category = "return",
+    period = "1y",
+    assetClass,
+    limit = 20,
+    offset = 0,
+  } = filters;
+
+  const categoryKey = RANKING_CATEGORIES.has(category) ? category : "return";
+  const periodKey = VALID_PERIODS.has(period) ? period : "1y";
+  const periodField = resolvePeriodField(periodKey);
+
+  const isFree = isFreePlan(plan);
+  const maxLimit = isFree ? FREE_SCREENER_LIMIT : MAX_SCREENER_LIMIT;
+  const limitVal = Math.min(Math.max(parseInt(limit, 10) || 20, 1), maxLimit);
+  const offsetVal = isFree ? 0 : Math.max(parseInt(offset, 10) || 0, 0);
+
+  const whereParts = [`s.type = 'ETF'`, `(s.is_active IS NULL OR s.is_active = true)`];
+  const replacements = { limit: limitVal, offset: offsetVal };
+
+  if (categoryKey === "yield") {
+    whereParts.push(`m.dividend_yield_ttm IS NOT NULL`);
+  } else if (categoryKey === "volatility") {
+    whereParts.push(`m.volatility_1y IS NOT NULL`);
+  } else {
+    whereParts.push(`m.${periodField} IS NOT NULL`);
+  }
+
+  if (assetClass) {
+    whereParts.push(`m.asset_class ILIKE :assetClass`);
+    replacements.assetClass = `%${assetClass}%`;
+  }
+
+  const sortColumn =
+    categoryKey === "yield"
+      ? "m.dividend_yield_ttm"
+      : categoryKey === "volatility"
+        ? "m.volatility_1y"
+        : `m.${periodField}`;
+
+  const sortOrder = categoryKey === "volatility" ? "ASC" : "DESC";
+  const whereClause = whereParts.join(" AND ");
+
+  const [countRow] = await sequelize.query(
+    `
+    SELECT COUNT(*)::int AS total
+    FROM etf_metrics m
+    INNER JOIN stocks s ON s.symbol = m.symbol
+    WHERE ${whereClause}
+    `,
+    { replacements, type: QueryTypes.SELECT }
+  );
+
+  const rows = await sequelize.query(
+    `
+    SELECT m.symbol, s.name, m.latest_price, m.as_of_date,
+      m.return_ytd, m.return_1y, m.return_3y, m.return_5y,
+      m.dividend_yield_ttm, m.volatility_1y, m.avg_volume_30d, m.asset_class
+    FROM etf_metrics m
+    INNER JOIN stocks s ON s.symbol = m.symbol
+    WHERE ${whereClause}
+    ORDER BY ${sortColumn} ${sortOrder} NULLS LAST, m.symbol ASC
+    LIMIT :limit OFFSET :offset
+    `,
+    { replacements, type: QueryTypes.SELECT }
+  );
+
+  return {
+    category: categoryKey,
+    period: periodKey,
+    data: rows.map((r, i) => ({
+      rank: offsetVal + i + 1,
+      symbol: r.symbol,
+      name: r.name,
+      latestPrice: r.latest_price != null ? parseFloat(r.latest_price) : null,
+      asOf: toDateStr(r.as_of_date),
+      returnYtd: r.return_ytd != null ? parseFloat(r.return_ytd) : null,
+      return1y: r.return_1y != null ? parseFloat(r.return_1y) : null,
+      return3y: r.return_3y != null ? parseFloat(r.return_3y) : null,
+      return5y: r.return_5y != null ? parseFloat(r.return_5y) : null,
+      dividendYieldTtm:
+        r.dividend_yield_ttm != null ? parseFloat(r.dividend_yield_ttm) : null,
+      volatility1y: r.volatility_1y != null ? parseFloat(r.volatility_1y) : null,
+      avgVolume30d: r.avg_volume_30d ? Number(r.avg_volume_30d) : null,
+      assetClass: r.asset_class ?? null,
+    })),
+    total: countRow?.total ?? 0,
+    limit: limitVal,
+    offset: offsetVal,
+    freeTierLimited: isFree,
+  };
+}
