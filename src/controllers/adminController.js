@@ -7,6 +7,10 @@ import prisma from '../utils/prisma.js';
 import { adminCreditAdjustment, getBalance } from '../services/creditService.js';
 import { logAdminAction } from '../services/adminAuditService.js';
 import { NotFoundError, ValidationError, ForbiddenError } from '../utils/errors.js';
+import {
+  prismaUserPlanToSlug,
+  syncApiUserPlanByEmail,
+} from '../utils/syncApiUserPlan.js';
 import { z } from 'zod';
 
 const creditSchema = z.object({ amount: z.number().int().min(-10000).max(10000) });
@@ -305,6 +309,13 @@ export const planOverride = async (req, res, next) => {
       where: { id },
       data: { plan: parsed.data.plan, planExpiresAt: null },
     });
+
+    if (user.email) {
+      await syncApiUserPlanByEmail(
+        user.email,
+        prismaUserPlanToSlug(parsed.data.plan)
+      ).catch(() => {});
+    }
 
     await logAdminAction(req.user.id, 'plan_override', 'USER', id, {
       oldPlan,

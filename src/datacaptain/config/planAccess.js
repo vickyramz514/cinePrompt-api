@@ -40,13 +40,37 @@ export function isFreePlan(plan) {
   return slug === "free" || !slug;
 }
 
+const PLAN_RANK = {
+  free: 0,
+  starter: 1,
+  creator: 2,
+  pro: 3,
+  ultra: 4,
+  enterprise: 5,
+};
+
+/** Highest-tier plan slug from dashboard / subscription / api_users sources. */
+export function bestPlanSlug(...plans) {
+  let best = "free";
+  let bestRank = -1;
+  for (const plan of plans) {
+    const slug = normalizePlanSlug(plan);
+    const rank = PLAN_RANK[slug] ?? 0;
+    if (rank > bestRank) {
+      bestRank = rank;
+      best = slug;
+    }
+  }
+  return best;
+}
+
 /**
  * @param {string} path - e.g. /stocks/prices or /options/AAPL
  * @param {string} [method]
  */
 export function isApiPathAllowedForPlan(path, method = "GET", plan) {
-  if (method !== "GET") return false;
   if (!isFreePlan(plan)) return true;
+  if (method !== "GET") return false;
 
   const normalized = path.split("?")[0];
   if (FREE_API_PATHS.has(normalized)) return true;

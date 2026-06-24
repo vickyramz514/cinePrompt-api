@@ -1,9 +1,12 @@
 /**
  * Return user with plan aligned to active UserSubscription (fixes stale FREE after payment).
+ * Respects admin/manual plan overrides — never downgrades a higher User.plan.
  */
 
 import prisma from './prisma.js';
+import { bestPlanSlug } from '../datacaptain/config/planAccess.js';
 import { mapPlanSlugToUserPlan } from './subscriptionPlanResolver.js';
+import { prismaUserPlanToSlug } from './syncApiUserPlan.js';
 
 export async function enrichUserWithEffectivePlan(user) {
   if (!user?.id) return user;
@@ -14,17 +17,32 @@ export async function enrichUserWithEffectivePlan(user) {
     orderBy: { updatedAt: 'desc' },
   });
 
-  if (!activeSub?.plan?.slug) return user;
+  const effectiveSlug = bestPlanSlug(
+    prismaUserPlanToSlug(user.plan),
+    activeSub?.plan?.slug
+  );
+  const effectivePlan = mapPlanSlugToUserPlan(effectiveSlug);
 
-  const effectivePlan = mapPlanSlugToUserPlan(activeSub.plan.slug);
-  if (user.plan === effectivePlan) return user;
+  if (user.plan === effectivePlan) {
+    return {
+      ...user,
+      planExpiresAt: activeSub?.currentPeriodEnd ?? user.planExpiresAt,
+    };
+  }
 
   await prisma.user
     .update({
       where: { id: user.id },
-      data: { plan: effectivePlan, planExpiresAt: activeSub.currentPeriodEnd },
+      data: {
+        plan: effectivePlan,
+        planExpiresAt: activeSub?.currentPeriodEnd ?? user.planExpiresAt,
+      },
     })
     .catch(() => {});
 
-  return { ...user, plan: effectivePlan, planExpiresAt: activeSub.currentPeriodEnd };
+  return {
+    ...user,
+    plan: effectivePlan,
+    planExpiresAt: activeSub?.currentPeriodEnd ?? user.planExpiresAt,
+  };
 }

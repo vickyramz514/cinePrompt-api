@@ -4,11 +4,11 @@
 
 import {
   isApiPathAllowedForPlan,
-  normalizePlanSlug,
 } from "../config/planAccess.js";
+import { resolveEffectivePlanForApiUser } from "../../utils/syncApiUserPlan.js";
 
-export function planGate(req, res, next) {
-  const plan = normalizePlanSlug(req.apiUser?.plan);
+export async function planGate(req, res, next) {
+  const plan = await resolveEffectivePlanForApiUser(req.apiUser);
   const path = req.path || "";
 
   if (isApiPathAllowedForPlan(path, req.method, plan)) {

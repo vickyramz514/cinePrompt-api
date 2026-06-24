@@ -55,6 +55,51 @@ async function loadPriceSeries(symbol, startDate, endDate) {
   }));
 }
 
+function formatDateOnly(value) {
+  if (!value) return null;
+  if (typeof value === "string") return value.slice(0, 10);
+  return value.toISOString().slice(0, 10);
+}
+
+async function getPriceDateBounds(symbol) {
+  const sym = symbol.toUpperCase();
+  const [first, last] = await Promise.all([
+    HistoricalPrice.findOne({
+      where: { symbol: sym },
+      order: [["date", "ASC"]],
+      attributes: ["date"],
+      raw: true,
+    }),
+    HistoricalPrice.findOne({
+      where: { symbol: sym },
+      order: [["date", "DESC"]],
+      attributes: ["date"],
+      raw: true,
+    }),
+  ]);
+
+  return {
+    first: formatDateOnly(first?.date),
+    last: formatDateOnly(last?.date),
+  };
+}
+
+async function assertEnoughPriceHistory(symbol, startDate, endDate, prices) {
+  if (prices.length >= 2) return;
+
+  const bounds = await getPriceDateBounds(symbol);
+  if (!bounds.first || !bounds.last) {
+    throw new ValidationError(
+      `No historical prices found for ${symbol.toUpperCase()}. Sync or seed market data before running backtests.`
+    );
+  }
+
+  throw new ValidationError(
+    `Not enough price history for ${startDate} to ${endDate}. ` +
+      `${symbol.toUpperCase()} data is available from ${bounds.first} to ${bounds.last}.`
+  );
+}
+
 async function estimateDividendYield(symbol, startDate, endDate, startPrice) {
   const dividends = await Dividend.findAll({
     where: {
@@ -164,6 +209,7 @@ export async function runBuyAndHoldBacktest(input) {
 
   const stock = await assertSymbol(symbol);
   const prices = await loadPriceSeries(symbol, startDate, endDate);
+  await assertEnoughPriceHistory(symbol, startDate, endDate, prices);
   const metrics = computeMetrics(prices, investment);
   const dividendYield = await estimateDividendYield(
     symbol,

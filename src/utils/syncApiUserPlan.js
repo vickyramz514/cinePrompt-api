@@ -3,8 +3,11 @@
  */
 
 import { ApiUser } from "../datacaptain/models/index.js";
+import prisma from "./prisma.js";
 import {
+  bestPlanSlug,
   dailyLimitForPlan,
+  isFreePlan,
   normalizePlanSlug,
 } from "../datacaptain/config/planAccess.js";
 
@@ -12,6 +15,40 @@ import {
 export function prismaUserPlanToSlug(userPlan) {
   if (!userPlan) return "free";
   return String(userPlan).toLowerCase();
+}
+
+/**
+ * Resolve plan for API requests — uses api_users.plan, User.plan, and active subscription.
+ * @param {{ email?: string, plan?: string } | null | undefined} apiUser
+ */
+export async function resolveEffectivePlanForApiUser(apiUser) {
+  const stored = normalizePlanSlug(apiUser?.plan);
+  if (!apiUser?.email) return stored;
+  if (!isFreePlan(stored)) return stored;
+
+  const user = await prisma.user.findUnique({
+    where: { email: apiUser.email },
+    select: { id: true, plan: true },
+  });
+  if (!user) return stored;
+
+  const activeSub = await prisma.userSubscription.findFirst({
+    where: { userId: user.id, status: "ACTIVE" },
+    include: { plan: { select: { slug: true } } },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  const effective = bestPlanSlug(
+    stored,
+    prismaUserPlanToSlug(user.plan),
+    activeSub?.plan?.slug
+  );
+
+  if (!isFreePlan(effective) && effective !== stored) {
+    syncApiUserPlanByEmail(apiUser.email, effective).catch(() => {});
+  }
+
+  return effective;
 }
 
 /**

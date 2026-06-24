@@ -109,13 +109,15 @@ async function resolveFullKey(apiKey) {
  */
 export async function getApiKey(req, res, next) {
   try {
-    const { email, name } = req.user;
+    const { enrichUserWithEffectivePlan } = await import('../utils/userPlanEnrichment.js');
+    const user = await enrichUserWithEffectivePlan(req.user);
+    const { email, name } = user;
     if (!email) {
       return res.status(400).json({ success: false, error: { message: 'User email required' } });
     }
 
     let apiUser = await ApiUser.findOne({ where: { email } });
-    const planSlug = (req.user?.plan && String(req.user.plan).toLowerCase()) || 'free';
+    const planSlug = (user?.plan && String(user.plan).toLowerCase()) || 'free';
     const dailyLimit = dailyLimitForPlan(planSlug);
     if (!apiUser) {
       apiUser = await ApiUser.create({
@@ -126,7 +128,7 @@ export async function getApiKey(req, res, next) {
         daily_limit: dailyLimit,
       });
     } else {
-      await syncApiUserPlanFromUser({ email, plan: req.user?.plan });
+      await syncApiUserPlanFromUser({ email, plan: user?.plan });
       await apiUser.reload();
     }
 
@@ -176,13 +178,15 @@ export async function getApiKey(req, res, next) {
  */
 export async function regenerateApiKey(req, res, next) {
   try {
-    const { email, name } = req.user;
+    const { enrichUserWithEffectivePlan } = await import('../utils/userPlanEnrichment.js');
+    const user = await enrichUserWithEffectivePlan(req.user);
+    const { email, name } = user;
     if (!email) {
       return res.status(400).json({ success: false, error: { message: 'User email required' } });
     }
 
     let apiUser = await ApiUser.findOne({ where: { email } });
-    const planSlug = (req.user?.plan && String(req.user.plan).toLowerCase()) || 'free';
+    const planSlug = (user?.plan && String(user.plan).toLowerCase()) || 'free';
     const dailyLimit = dailyLimitForPlan(planSlug);
     if (!apiUser) {
       apiUser = await ApiUser.create({
@@ -193,7 +197,7 @@ export async function regenerateApiKey(req, res, next) {
         daily_limit: dailyLimit,
       });
     } else {
-      await syncApiUserPlanFromUser({ email, plan: req.user?.plan });
+      await syncApiUserPlanFromUser({ email, plan: user?.plan });
       await apiUser.reload();
     }
 
