@@ -18,10 +18,14 @@ import StockSentiment from "./StockSentiment.js";
 import EconomicIndicator from "./EconomicIndicator.js";
 import DarkPoolTrade from "./DarkPoolTrade.js";
 import StockNews from "./StockNews.js";
+import EtfMetrics from "./EtfMetrics.js";
 
 // Associations
 Stock.hasMany(HistoricalPrice, { foreignKey: "symbol", sourceKey: "symbol" });
 HistoricalPrice.belongsTo(Stock, { foreignKey: "symbol", targetKey: "symbol" });
+
+Stock.hasOne(EtfMetrics, { foreignKey: "symbol", sourceKey: "symbol" });
+EtfMetrics.belongsTo(Stock, { foreignKey: "symbol", targetKey: "symbol" });
 
 Stock.hasMany(Dividend, { foreignKey: "symbol" });
 Dividend.belongsTo(Stock, { foreignKey: "symbol" });
@@ -57,6 +61,7 @@ export {
   EconomicIndicator,
   DarkPoolTrade,
   StockNews,
+  EtfMetrics,
 };
 
 export default sequelize;

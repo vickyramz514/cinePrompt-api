@@ -19,6 +19,8 @@
     "db:seed:plans": "node prisma/seed-subscription-plans.js",
     "db:seed:market": "node scripts/seed-market-data.js",
     "db:seed:etf": "SKIP_MARKET_DATA=1 node scripts/seed-market-data.js",
+    "etf:compute-metrics": "node scripts/compute-etf-metrics.js",
+    "db:sync:market-prices": "node scripts/sync-market-prices-only.js",
     "razorpay:create-plans": "node scripts/create-razorpay-plans.js",
     "razorpay:link-plans": "node scripts/link-razorpay-plans.js",
     "razorpay:link-plans:test": "RAZORPAY_PLAN_MAP_MODE=test node scripts/link-razorpay-plans.js",

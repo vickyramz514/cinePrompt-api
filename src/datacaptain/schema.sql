@@ -54,6 +54,24 @@ CREATE TABLE dividends (
 CREATE INDEX idx_dividends_symbol ON dividends(symbol);
 CREATE INDEX idx_dividends_ex_date ON dividends(ex_date);
 
+-- Cached ETF metrics (screener + heatmap)
+CREATE TABLE etf_metrics (
+  symbol VARCHAR(20) PRIMARY KEY REFERENCES stocks(symbol),
+  as_of_date DATE NOT NULL,
+  latest_price DECIMAL(18,4),
+  latest_price_date DATE,
+  return_ytd DECIMAL(10,4),
+  return_1y DECIMAL(10,4),
+  return_3y DECIMAL(10,4),
+  return_5y DECIMAL(10,4),
+  dividend_yield_ttm DECIMAL(10,4),
+  volatility_1y DECIMAL(10,4),
+  avg_volume_30d BIGINT,
+  asset_class VARCHAR(80),
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP
+);
+
 -- Earnings
 CREATE TABLE earnings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

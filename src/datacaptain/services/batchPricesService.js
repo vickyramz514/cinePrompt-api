@@ -4,9 +4,8 @@
  */
 
 import sequelize from "../config/database.js";
-import { QueryTypes } from "sequelize";
+import { QueryTypes, Op } from "sequelize";
 import { Stock } from "../models/index.js";
-import { Op } from "sequelize";
 
 const MAX_SYMBOLS = 50;
 

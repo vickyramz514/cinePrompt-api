@@ -54,6 +54,11 @@ export const cacheKeys = {
   },
   etfList: (req) =>
     `etf:list:${req.query.limit || 100}:${req.query.offset || 0}:${(req.query.search || req.query.q || "").toLowerCase()}`,
+  etfHeatmap: (req) =>
+    `etf:heatmap:${req.query.basket || ""}:${req.query.symbols || ""}:${req.query.period || "1y"}`,
+  etfHeatmapBaskets: () => "etf:heatmap:baskets",
+  etfScreener: (req) =>
+    `etf:screener:${req.query.period || "1y"}:${req.query.returnMin || ""}:${req.query.dividendYieldMin || ""}:${req.query.assetClass || ""}:${req.query.sort || "return"}:${req.query.limit || 50}:${req.query.offset || 0}`,
   etfSymbol: (req) => `etf:${req.params.symbol}`,
   optionsChain: (req) =>
     `options:${req.params.symbol}:${req.query.expirationDate || "all"}:${req.query.limit || 50}`,

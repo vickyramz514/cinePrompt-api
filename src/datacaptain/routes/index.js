@@ -18,6 +18,7 @@ import * as marketStatusController from "../controllers/marketStatusController.j
 import * as batchPricesController from "../controllers/batchPricesController.js";
 import * as etfController from "../controllers/etfController.js";
 import * as backtestController from "../controllers/backtestController.js";
+import * as portfolioController from "../controllers/portfolioController.js";
 import * as newsController from "../controllers/newsController.js";
 import { usageLogger } from "../middlewares/usageLogger.js";
 import optionsRoutes from "./optionsRoutes.js";
@@ -119,7 +120,22 @@ router.get(
 // Developer Usage
 router.get("/developer/usage", developerUsageController.getUsage);
 
-// ETF endpoints
+// ETF endpoints (specific paths before /etf/:symbol)
+router.get(
+  "/etf/heatmap/baskets",
+  cacheMiddleware(cacheKeys.etfHeatmapBaskets),
+  etfController.getEtfHeatmapBaskets
+);
+router.get(
+  "/etf/heatmap",
+  cacheMiddleware(cacheKeys.etfHeatmap),
+  etfController.getEtfHeatmap
+);
+router.get(
+  "/etf/screener",
+  cacheMiddleware(cacheKeys.etfScreener),
+  etfController.getEtfScreener
+);
 router.get(
   "/etf/list",
   cacheMiddleware(cacheKeys.etfList),
@@ -136,6 +152,10 @@ router.post("/backtest/buy-and-hold", backtestController.runBuyAndHold);
 router.get("/backtest/buy-and-hold", backtestController.runBuyAndHold);
 router.post("/backtest/compare", backtestController.compareSymbols);
 router.get("/backtest/compare", backtestController.compareSymbols);
+
+// Portfolio tools
+router.post("/portfolio/rebalance", portfolioController.rebalance);
+router.get("/portfolio/rebalance", portfolioController.rebalance);
 
 // Premium data APIs
 router.use("/options", optionsRoutes);

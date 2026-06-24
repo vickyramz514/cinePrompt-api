@@ -107,7 +107,7 @@ router.use('/api-keys', apiKeyRoutes);
 router.use('/usage', usageRoutes);
 
 // DataCaptain - market data APIs (x-api-key auth); only for /stocks, /market, /developer, /etf, /options, etc.
-const datacaptainPaths = ['/stocks', '/market', '/search', '/screener', '/indicators', '/ai', '/developer', '/etf', '/backtest', '/options', '/insiders', '/sentiment', '/economy', '/darkpool'];
+const datacaptainPaths = ['/stocks', '/market', '/search', '/screener', '/indicators', '/ai', '/developer', '/etf', '/backtest', '/portfolio', '/options', '/insiders', '/sentiment', '/economy', '/darkpool'];
 router.use((req, res, next) => {
   const isDataCaptain = datacaptainPaths.some((p) => req.path === p || req.path.startsWith(p + '/'));
   if (isDataCaptain) return datacaptainRoutes(req, res, next);
