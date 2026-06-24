@@ -17,6 +17,7 @@ import * as developerUsageController from "../controllers/developerUsageControll
 import * as marketStatusController from "../controllers/marketStatusController.js";
 import * as batchPricesController from "../controllers/batchPricesController.js";
 import * as etfController from "../controllers/etfController.js";
+import * as backtestController from "../controllers/backtestController.js";
 import * as newsController from "../controllers/newsController.js";
 import { usageLogger } from "../middlewares/usageLogger.js";
 import optionsRoutes from "./optionsRoutes.js";
@@ -129,6 +130,12 @@ router.get(
   cacheMiddleware(cacheKeys.etfSymbol),
   etfController.getEtfBySymbol
 );
+
+// Backtesting & portfolio tools
+router.post("/backtest/buy-and-hold", backtestController.runBuyAndHold);
+router.get("/backtest/buy-and-hold", backtestController.runBuyAndHold);
+router.post("/backtest/compare", backtestController.compareSymbols);
+router.get("/backtest/compare", backtestController.compareSymbols);
 
 // Premium data APIs
 router.use("/options", optionsRoutes);

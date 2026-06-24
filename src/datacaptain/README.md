@@ -40,6 +40,7 @@ npm run datacaptain:db:seed     # Seed API key
 - /api/market/status, /api/market/top-gainers, etc.
 - /api/developer/usage
 - /api/etf/list, /api/etf/:symbol
+- /api/backtest/buy-and-hold, /api/backtest/compare (paid)
 - /api/options/:symbol
 - /api/insiders/:symbol
 - /api/sentiment/:symbol
