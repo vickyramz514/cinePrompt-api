@@ -20,6 +20,7 @@ import referralRoutes from './referralRoutes.js';
 import affiliateRoutes from './affiliateRoutes.js';
 import apiKeyRoutes from './apiKeyRoutes.js';
 import usageRoutes from './usageRoutes.js';
+import * as statusController from '../controllers/statusController.js';
 
 const router = Router();
 
@@ -117,5 +118,7 @@ router.use((req, res, next) => {
 router.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+router.get('/status', statusController.getStatus);
 
 export default router;
