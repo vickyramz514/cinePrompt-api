@@ -15,7 +15,6 @@ export const getInvestorMetrics = async () => {
     paymentsThisMonth,
     paymentsLastMonth,
     totalRevenue,
-    apiCostThisMonth,
     totalUsers,
     cancelledThisMonth,
     balance,
@@ -34,10 +33,6 @@ export const getInvestorMetrics = async () => {
       where: { status: 'COMPLETED' },
       _sum: { amountCents: true },
     }),
-    prisma.apiCostLog.aggregate({
-      where: { createdAt: { gte: monthStart } },
-      _sum: { cost: true },
-    }).catch(() => ({ _sum: { cost: 0 } })),
     prisma.user.count(),
     prisma.userSubscription.count({
       where: { status: 'CANCELLED', cancelledAt: { gte: monthStart } },
@@ -63,7 +58,7 @@ export const getInvestorMetrics = async () => {
       ? ((revenueThisMonth - revenueLastMonth) / revenueLastMonth) * 100
       : revenueThisMonth > 0 ? 100 : 0;
 
-  const apiCost = apiCostThisMonth._sum?.cost ?? 0;
+  const apiCost = 0;
   const totalRevenueCents = totalRevenue._sum?.amountCents ?? 0;
   const totalRevenueInr = totalRevenueCents / 100;
   const profitMargin =

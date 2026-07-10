@@ -1,13 +1,12 @@
 /**
  * API route aggregation
- * CinePrompt (auth, video, wallet, etc.) + DataCaptain (stocks, market data)
+ * DataCaptain API (auth, wallet, billing, etc.) + market data routes
  */
 
 import { Router } from 'express';
 import config from '../config/index.js';
 import authRoutes from './authRoutes.js';
 import datacaptainRoutes from '../datacaptain/routes/index.js';
-import videoRoutes from './videoRoutes.js';
 import walletRoutes from './walletRoutes.js';
 import profileRoutes from './profileRoutes.js';
 import notificationRoutes from './notificationRoutes.js';
@@ -27,7 +26,7 @@ const router = Router();
 router.get('/', (req, res) => {
   res.json({
     success: true,
-    message: 'CinePrompt AI API',
+    message: 'DataCaptain API',
     version: '1.0',
     endpoints: {
       health: 'GET /api/health',
@@ -37,11 +36,6 @@ router.get('/', (req, res) => {
         google: 'POST /api/auth/google',
         refresh: 'POST /api/auth/refresh',
         me: 'GET /api/auth/me (auth required)',
-      },
-      video: {
-        generate: 'POST /api/video/generate (auth required)',
-        history: 'GET /api/video/history (auth required)',
-        getById: 'GET /api/video/:id (auth required)',
       },
       wallet: {
         balance: 'GET /api/wallet/balance (auth required)',
@@ -84,16 +78,13 @@ router.get('/', (req, res) => {
       admin: {
         dashboard: 'GET /api/admin/dashboard (admin)',
         users: 'GET /api/admin/users (admin)',
-        jobs: 'GET /api/admin/jobs (admin)',
         payments: 'GET /api/admin/payments (admin)',
-        abuseLogs: 'GET /api/admin/abuse-logs (admin)',
       },
     },
   });
 });
 
 router.use('/auth', authRoutes);
-router.use('/video', videoRoutes);
 router.use('/wallet', walletRoutes);
 router.use('/profile', profileRoutes);
 router.use('/notifications', notificationRoutes);

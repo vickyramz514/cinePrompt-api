@@ -71,70 +71,6 @@ export const addCredits = async (tx, userId, amount, metadata = {}) => {
   return balanceAfter;
 };
 
-export const deductForVideoJob = async (userId, jobId, amount) => {
-  return prisma.$transaction(async (tx) => {
-    const wallet = await getOrCreateWallet(tx, userId);
-    const balanceAfter = await deductCredits(tx, userId, amount);
-
-    await tx.creditLedgerEntry.create({
-      data: {
-        walletId: wallet.id,
-        amount: -amount,
-        balanceAfter,
-        type: 'VIDEO_GENERATION',
-        status: 'COMPLETED',
-        referenceId: jobId,
-        referenceType: 'video_job',
-      },
-    });
-
-    await tx.transaction.create({
-      data: {
-        userId,
-        amount: -amount,
-        credits: amount,
-        status: 'COMPLETED',
-        type: 'VIDEO_GENERATION',
-        referenceId: jobId,
-      },
-    });
-
-    return balanceAfter;
-  });
-};
-
-export const refundCredits = async (userId, jobId, amount) => {
-  return prisma.$transaction(async (tx) => {
-    const balanceAfter = await addCredits(tx, userId, amount);
-    const wallet = await getOrCreateWallet(tx, userId);
-
-    await tx.creditLedgerEntry.create({
-      data: {
-        walletId: wallet.id,
-        amount,
-        balanceAfter,
-        type: 'VIDEO_REFUND',
-        status: 'REFUNDED',
-        referenceId: jobId,
-        referenceType: 'video_job',
-      },
-    });
-
-    await tx.transaction.create({
-      data: {
-        userId,
-        amount,
-        credits: amount,
-        status: 'REFUNDED',
-        type: 'VIDEO_REFUND',
-        referenceId: jobId,
-      },
-    });
-
-    return balanceAfter;
-  });
-};
-
 export const addCreditsPurchase = async (userId, amount, paymentId = null) => {
   return prisma.$transaction(async (tx) => {
     const balanceAfter = await addCredits(tx, userId, amount);
@@ -257,13 +193,4 @@ export const getBalance = async (userId) => {
     select: { credits: true },
   });
   return user?.credits ?? 0;
-};
-
-/**
- * Get max video duration (seconds) allowed for a plan
- * @param {string} plan - UserPlan enum (FREE, STARTER, CREATOR, PRO, ULTRA)
- */
-export const getMaxDuration = (plan = 'FREE') => {
-  const planConfig = config.planLimits[plan] ?? config.planLimits.FREE;
-  return typeof planConfig === 'object' ? planConfig.maxDuration : 5;
 };

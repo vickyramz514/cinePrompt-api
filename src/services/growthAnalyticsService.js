@@ -7,7 +7,6 @@ import prisma from '../utils/prisma.js';
 const EVENT_TYPES = [
   'signup',
   'login',
-  'video_created',
   'payment_done',
   'subscription_started',
   'subscription_cancelled',
@@ -91,25 +90,25 @@ async function getChurn(start, days) {
 }
 
 async function getFunnelConversion(start, days) {
-  const [signups, firstVideo, subscriptions] = await Promise.all([
+  const [signups, payments, subscriptions] = await Promise.all([
     prisma.user.count({ where: { createdAt: { gte: start } } }),
-    prisma.growthEvent.count({
-      where: { eventType: 'video_created', createdAt: { gte: start } },
+    prisma.payment.count({
+      where: { status: 'COMPLETED', createdAt: { gte: start } },
     }),
     prisma.userSubscription.count({
       where: { status: 'ACTIVE', createdAt: { gte: start } },
     }),
   ]);
 
-  const signupToVideo = signups > 0 ? ((firstVideo / signups) * 100).toFixed(1) : 0;
-  const videoToSub = firstVideo > 0 ? ((subscriptions / firstVideo) * 100).toFixed(1) : 0;
+  const signupToPayment = signups > 0 ? ((payments / signups) * 100).toFixed(1) : 0;
+  const paymentToSub = payments > 0 ? ((subscriptions / payments) * 100).toFixed(1) : 0;
 
   return {
     signups,
-    firstVideo,
+    payments,
     subscriptions,
-    signupToVideo: parseFloat(signupToVideo),
-    videoToSub: parseFloat(videoToSub),
+    signupToPayment: parseFloat(signupToPayment),
+    paymentToSub: parseFloat(paymentToSub),
   };
 }
 

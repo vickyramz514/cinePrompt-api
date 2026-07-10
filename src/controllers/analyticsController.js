@@ -1,11 +1,10 @@
 /**
  * Analytics Dashboard APIs
- * Admin-only endpoints for business metrics
  */
 
 import prisma from '../utils/prisma.js';
-import { getDailyCost } from '../services/costService.js';
 import { ForbiddenError } from '../utils/errors.js';
+import { getDailyApiUsage, getTopApiUsers } from '../utils/apiUsageStats.js';
 
 const requireAdmin = (req) => {
   if (!req.user?.role || !['ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
@@ -15,36 +14,28 @@ const requireAdmin = (req) => {
 
 /**
  * GET /api/analytics/overview
- * revenue, total cost, profit, total users, total jobs
  */
 export const getOverview = async (req, res, next) => {
   try {
     requireAdmin(req);
 
-    const [totalUsers, totalJobs, payments, costData] = await Promise.all([
+    const [totalUsers, payments, apiUsage] = await Promise.all([
       prisma.user.count(),
-      prisma.videoJob.count({ where: { status: 'COMPLETED' } }),
       prisma.payment.aggregate({
         where: { status: 'COMPLETED' },
         _sum: { amountCents: true },
       }),
-      prisma.apiCostLog.aggregate({
-        _sum: { cost: true },
-      }),
+      prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM api_usage`.catch(() => [{ count: 0 }]),
     ]);
 
     const revenueCents = payments._sum.amountCents ?? 0;
-    const revenueInr = revenueCents / 100;
-    const totalCostUsd = costData._sum.cost ?? 0;
 
     res.json({
       success: true,
       data: {
         totalUsers,
-        totalJobs,
-        revenue: { cents: revenueCents, inr: revenueInr },
-        totalApiCostUsd: totalCostUsd,
-        profitInr: revenueInr - totalCostUsd * 83, // Approx INR conversion
+        totalApiRequests: apiUsage[0]?.count ?? 0,
+        revenue: { cents: revenueCents, inr: revenueCents / 100 },
       },
     });
   } catch (err) {
@@ -54,7 +45,6 @@ export const getOverview = async (req, res, next) => {
 
 /**
  * GET /api/analytics/usage-trends
- * daily video jobs + seconds usage
  */
 export const getUsageTrends = async (req, res, next) => {
   try {
@@ -65,23 +55,11 @@ export const getUsageTrends = async (req, res, next) => {
     start.setDate(start.getDate() - days);
     start.setHours(0, 0, 0, 0);
 
-    const byDate = await prisma.$queryRaw`
-      SELECT DATE("createdAt") as date,
-             COUNT(*)::int as jobs,
-             COALESCE(SUM("creditsUsed"), 0)::int as seconds
-      FROM "VideoJob"
-      WHERE "createdAt" >= ${start}
-        AND status = 'COMPLETED'
-      GROUP BY DATE("createdAt")
-      ORDER BY date ASC
-    `;
+    const byDate = await getDailyApiUsage(start);
 
     res.json({
       success: true,
-      data: {
-        byDate,
-        days,
-      },
+      data: { byDate, days },
     });
   } catch (err) {
     next(err);
@@ -90,23 +68,15 @@ export const getUsageTrends = async (req, res, next) => {
 
 /**
  * GET /api/analytics/api-cost
- * daily + monthly cost aggregation
+ * Kept for route compatibility — video provider costs removed.
  */
 export const getApiCost = async (req, res, next) => {
   try {
     requireAdmin(req);
-
     const days = Math.min(parseInt(req.query.days || '30', 10), 90);
-    const { totalCost, byProvider, byDate } = await getDailyCost(days);
-
     res.json({
       success: true,
-      data: {
-        totalCostUsd: totalCost,
-        byProvider,
-        byDate,
-        days,
-      },
+      data: { totalCostUsd: 0, byProvider: [], byDate: [], days },
     });
   } catch (err) {
     next(err);
@@ -115,7 +85,6 @@ export const getApiCost = async (req, res, next) => {
 
 /**
  * GET /api/analytics/top-users
- * highest usage users
  */
 export const getTopUsers = async (req, res, next) => {
   try {
@@ -126,33 +95,15 @@ export const getTopUsers = async (req, res, next) => {
     const start = new Date();
     start.setDate(start.getDate() - days);
 
-    const top = await prisma.$queryRaw`
-      SELECT "userId", COUNT(*)::int as jobs, COALESCE(SUM("creditsUsed"), 0)::int as seconds
-      FROM "VideoJob"
-      WHERE "createdAt" >= ${start} AND status = 'COMPLETED'
-      GROUP BY "userId"
-      ORDER BY seconds DESC
-      LIMIT ${limit}
-    `;
-
-    const userIds = top.map((t) => t.userId);
-    const users = await prisma.user.findMany({
-      where: { id: { in: userIds } },
-      select: { id: true, email: true, name: true, plan: true },
-    });
-    const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
-
-    const result = top.map((t) => ({
-      userId: t.userId,
-      user: userMap[t.userId],
-      jobsCount: t.jobs,
-      secondsUsed: t.seconds ?? 0,
-    }));
+    const top = await getTopApiUsers(start, limit);
 
     res.json({
       success: true,
       data: {
-        users: result,
+        users: top.map((row) => ({
+          email: row.email,
+          requestCount: row.requests,
+        })),
         days,
       },
     });
@@ -163,7 +114,6 @@ export const getTopUsers = async (req, res, next) => {
 
 /**
  * GET /api/analytics/profit-metrics
- * revenue - api cost trends
  */
 export const getProfitMetrics = async (req, res, next) => {
   try {
@@ -174,47 +124,23 @@ export const getProfitMetrics = async (req, res, next) => {
     start.setDate(start.getDate() - days);
     start.setHours(0, 0, 0, 0);
 
-    const [revenueByDate, costByDate] = await Promise.all([
-      prisma.$queryRaw`
-        SELECT DATE("createdAt") as date, SUM("amountCents")::int as cents
-        FROM "Payment"
-        WHERE "createdAt" >= ${start} AND status = 'COMPLETED'
-        GROUP BY DATE("createdAt")
-        ORDER BY date ASC
-      `,
-      prisma.$queryRaw`
-        SELECT DATE("createdAt") as date, SUM(cost)::float as cost_usd
-        FROM "ApiCostLog"
-        WHERE "createdAt" >= ${start}
-        GROUP BY DATE("createdAt")
-        ORDER BY date ASC
-      `,
-    ]);
+    const revenueByDate = await prisma.$queryRaw`
+      SELECT DATE("createdAt") as date, SUM("amountCents")::int as cents
+      FROM "Payment"
+      WHERE "createdAt" >= ${start} AND status = 'COMPLETED'
+      GROUP BY DATE("createdAt")
+      ORDER BY date ASC
+    `;
 
-    const revenueMap = Object.fromEntries(
-      revenueByDate.map((r) => [r.date?.toISOString?.()?.slice(0, 10) ?? r.date, r.cents])
-    );
-    const costMap = Object.fromEntries(
-      costByDate.map((c) => [c.date?.toISOString?.()?.slice(0, 10) ?? c.date, c.cost_usd])
-    );
-
-    const allDates = new Set([
-      ...Object.keys(revenueMap),
-      ...Object.keys(costMap),
-    ]);
-    const byDate = [...allDates].sort().map((date) => ({
-      date,
-      revenueCents: revenueMap[date] ?? 0,
-      costUsd: costMap[date] ?? 0,
-      profitInr: (revenueMap[date] ?? 0) / 100 - (costMap[date] ?? 0) * 83,
+    const byDate = revenueByDate.map((row) => ({
+      date: row.date,
+      revenueCents: row.cents ?? 0,
+      profitInr: (row.cents ?? 0) / 100,
     }));
 
     res.json({
       success: true,
-      data: {
-        byDate,
-        days,
-      },
+      data: { byDate, days },
     });
   } catch (err) {
     next(err);

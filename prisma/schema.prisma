@@ -38,35 +38,6 @@ enum AuthProvider {
   APPLE
 }
 
-enum VideoJobStatus {
-  PENDING
-  QUEUED
-  PROCESSING
-  COMPLETED
-  FAILED
-  CANCELLED
-}
-
-enum JobStepType {
-  UPLOADED      // Source uploaded
-  QUEUED        // In processing queue
-  PROCESSING    // General processing
-  AI_GENERATION // AI model inference
-  RENDERING     // Video rendering
-  UPLOADING     // Output upload to storage
-  COMPLETED     // Step success
-  FAILED        // Step failure
-}
-
-enum JobStepStatus {
-  PENDING
-  IN_PROGRESS
-  COMPLETED
-  FAILED
-  SKIPPED
-  RETRYING
-}
-
 enum TransactionType {
   VIDEO_GENERATION
   VIDEO_REFUND
@@ -145,7 +116,6 @@ model User {
   refreshTokens     RefreshToken[]
   wallet            Wallet?
   transactions      Transaction[]
-  videoJobs         VideoJob[]
   userSubscriptions UserSubscription[]
   payments          Payment[]
   notifications     Notification[]
@@ -239,92 +209,6 @@ model CreditLedgerEntry {
   @@index([type])
   @@index([referenceId, referenceType])
   @@index([walletId, createdAt]) // Ledger history query
-}
-
-// =============================================================================
-// VIDEO JOB & PROCESSING PIPELINE
-// =============================================================================
-
-model VideoJob {
-  id             String         @id @default(uuid())
-  userId         String
-  prompt         String         @db.Text
-  negativePrompt String?        @db.Text
-  provider       String         @default("MINIMAX") // MINIMAX | RUNWAY | REPLICATE
-  status         VideoJobStatus @default(PENDING)
-  progress       Int            @default(0)
-  priority       Int            @default(0)
-  creditsUsed    Int            @default(0)
-  creditsCost    Int            @default(0)
-  cost           Float?         // API cost USD
-  replicateId    String?        // Replicate prediction ID
-  runwayId       String?        // Runway task ID
-  storageKey     String?
-  videoUrl       String?
-  cdnUrl         String?        // CDN URL if configured
-  thumbnailUrl   String?
-  duration       Int?
-  resolution     String?
-  aspectRatio    String?
-  metadata       Json?
-  error          String?        @db.Text
-  retryCount     Int            @default(0)
-  maxRetries     Int            @default(3)
-  processingStartedAt  DateTime?
-  processingCompletedAt DateTime?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  completedAt    DateTime?
-
-  // Minimax / provider-specific fields
-  externalJobId   String?   @unique // CCAPI/Minimax job ID
-  providerStatus String?   // queued | processing | completed | failed
-  providerPayload Json?     // Request sent to provider
-  providerResponse Json?   // Last poll response
-  videoDurationSec Int?    // Actual duration from provider
-  videoResolution  String? // e.g. 720p
-  providerCost     Float?  // USD cost from provider
-
-  user     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  steps    JobStep[]
-
-  @@index([userId])
-  @@index([status])
-  @@index([createdAt])
-  @@index([status, priority, createdAt])
-  @@index([userId, createdAt])
-  @@index([replicateId])
-  @@index([runwayId])
-  @@index([externalJobId])
-}
-
-model JobStep {
-  id          String         @id @default(uuid())
-  jobId       String
-  stepType    JobStepType
-  stepOrder   Int            // Pipeline order (1, 2, 3...)
-  status      JobStepStatus  @default(PENDING)
-  progress    Int            @default(0)
-  retryCount  Int            @default(0)
-  maxRetries  Int            @default(2)
-  error       String?        @db.Text
-  errorCode   String?
-  inputData   Json?
-  outputData  Json?
-  startedAt   DateTime?
-  completedAt DateTime?
-  durationMs  Int?           // Processing time
-  workerId    String?         // For distributed processing
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-
-  job VideoJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
-
-  @@index([jobId])
-  @@index([jobId, stepOrder])
-  @@index([status])
-  @@index([stepType, status])
-  @@index([createdAt])
 }
 
 // =============================================================================
@@ -445,59 +329,6 @@ model Notification {
 
   @@index([userId])
   @@index([userId, readAt])
-  @@index([createdAt])
-}
-
-// =============================================================================
-// CREDIT LOCK - Pre-charge locking for safe deduction
-// =============================================================================
-
-model CreditLock {
-  id        String   @id @default(uuid())
-  userId    String
-  jobId     String   @unique // One lock per job
-  seconds   Int      // Video duration (seconds) - for provider cost calc
-  credits   Int?     // Credits to deduct (if null: use seconds for backward compat)
-  status    String   // LOCKED | CONSUMED | RELEASED
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([status])
-  @@index([userId, status])
-}
-
-// =============================================================================
-// API COST LOG - Provider cost tracking
-// =============================================================================
-
-model ApiCostLog {
-  id        String   @id @default(uuid())
-  userId    String
-  jobId     String?
-  provider  String   // "runway" | "replicate"
-  seconds   Int
-  cost      Float    // USD
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([provider])
-  @@index([createdAt])
-  @@index([userId, createdAt])
-}
-
-// =============================================================================
-// ABUSE LOG - Violation tracking
-// =============================================================================
-
-model AbuseLog {
-  id        String   @id @default(uuid())
-  userId    String
-  type      String   // RATE_LIMIT | CONCURRENT_JOB | PROMPT_SPAM | DAILY_CAP
-  meta      Json?
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([type])
   @@index([createdAt])
 }
 

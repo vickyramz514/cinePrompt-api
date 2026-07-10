@@ -17,10 +17,3 @@ export const trackLogin = (req, res, next) => {
   }
   next();
 };
-
-export const trackVideoCreated = (req, res, next) => {
-  if (req.user?.id) {
-    trackEvent('video_created', req.user.id, { jobId: res.locals?.jobId }).catch(() => {});
-  }
-  next();
-};

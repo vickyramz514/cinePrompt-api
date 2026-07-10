@@ -1,20 +1,21 @@
 #!/usr/bin/env node
 /**
- * Inspect and optionally drop unused Prisma tables.
+ * Inspect and optionally drop unused / legacy Prisma tables.
  *
  * Usage:
- *   node scripts/db-drop-unused-tables.js           # dry-run (row counts only)
- *   node scripts/db-drop-unused-tables.js --apply     # drop tables + enums
+ *   node scripts/db-drop-unused-tables.js              # dry-run
+ *   node scripts/db-drop-unused-tables.js --apply      # drop unused tables
+ *   node scripts/db-drop-unused-tables.js --apply --video  # also drop video pipeline
  */
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 
 const APPLY = process.argv.includes("--apply");
+const INCLUDE_VIDEO = process.argv.includes("--video");
 
-/** Prisma tables with zero runtime references (not Sequelize api_usage). */
 const UNUSED_PRISMA_TABLES = [
   { name: "CreditUsageLog", note: "Never written or read" },
-  { name: "VideoAsset", note: "Video pipeline never stores assets here" },
+  { name: "VideoAsset", note: "Legacy video asset store" },
   { name: "ApiUsage", note: "Superseded by Sequelize api_usage" },
   { name: "NotificationPreference", note: "No preference UI or API" },
   { name: "ErrorLog", note: "Errors go to logs, not DB" },
@@ -23,7 +24,15 @@ const UNUSED_PRISMA_TABLES = [
   { name: "SystemMetrics", note: "Metrics not implemented" },
 ];
 
-const DROP_SQL = `
+const VIDEO_PIPELINE_TABLES = [
+  { name: "JobStep", note: "Video pipeline step log" },
+  { name: "VideoJob", note: "Legacy video generation jobs" },
+  { name: "CreditLock", note: "Pre-charge locks for video" },
+  { name: "ApiCostLog", note: "Video provider cost log" },
+  { name: "AbuseLog", note: "Video abuse tracking" },
+];
+
+const DROP_UNUSED_SQL = `
 DROP TABLE IF EXISTS "CreditUsageLog" CASCADE;
 DROP TABLE IF EXISTS "VideoAsset" CASCADE;
 DROP TABLE IF EXISTS "ApiUsage" CASCADE;
@@ -34,6 +43,17 @@ DROP TABLE IF EXISTS "AuditLog" CASCADE;
 DROP TABLE IF EXISTS "SystemMetrics" CASCADE;
 DROP TYPE IF EXISTS "ErrorSeverity";
 DROP TYPE IF EXISTS "NotificationChannel";
+`;
+
+const DROP_VIDEO_SQL = `
+DROP TABLE IF EXISTS "JobStep" CASCADE;
+DROP TABLE IF EXISTS "VideoJob" CASCADE;
+DROP TABLE IF EXISTS "CreditLock" CASCADE;
+DROP TABLE IF EXISTS "ApiCostLog" CASCADE;
+DROP TABLE IF EXISTS "AbuseLog" CASCADE;
+DROP TYPE IF EXISTS "JobStepStatus";
+DROP TYPE IF EXISTS "JobStepType";
+DROP TYPE IF EXISTS "VideoJobStatus";
 `;
 
 const prisma = new PrismaClient();
@@ -54,11 +74,9 @@ async function rowCount(table) {
   return Number(rows[0]?.count ?? 0);
 }
 
-async function main() {
-  console.log(APPLY ? "Applying unused table cleanup...\n" : "Dry run — unused Prisma tables:\n");
-
+async function reportTables(tables) {
   let totalRows = 0;
-  for (const { name, note } of UNUSED_PRISMA_TABLES) {
+  for (const { name, note } of tables) {
     const exists = await tableExists(name);
     if (!exists) {
       console.log(`  - ${name}: (already dropped)`);
@@ -68,12 +86,27 @@ async function main() {
     totalRows += count;
     console.log(`  - ${name}: ${count.toLocaleString()} rows — ${note}`);
   }
+  return totalRows;
+}
 
-  console.log(`\nTotal rows in unused tables: ${totalRows.toLocaleString()}`);
+async function main() {
+  const tables = INCLUDE_VIDEO
+    ? [...UNUSED_PRISMA_TABLES, ...VIDEO_PIPELINE_TABLES]
+    : UNUSED_PRISMA_TABLES;
+
+  console.log(
+    APPLY
+      ? `Applying cleanup${INCLUDE_VIDEO ? " (including video pipeline)" : ""}...\n`
+      : `Dry run${INCLUDE_VIDEO ? " (including video pipeline)" : ""}:\n`
+  );
+
+  const totalRows = await reportTables(tables);
+  console.log(`\nTotal rows in listed tables: ${totalRows.toLocaleString()}`);
 
   if (!APPLY) {
-    console.log("\nNo changes made. Run with --apply to drop these tables.");
-    console.log("Or deploy migration: npm run db:migrate:prod");
+    console.log("\nNo changes made. Run with --apply to drop tables.");
+    console.log("Add --video to include VideoJob and related tables.");
+    console.log("Or deploy migrations: npm run db:migrate:prod");
     return;
   }
 
@@ -81,8 +114,11 @@ async function main() {
     console.warn("\nWarning: some tables still contain rows. Proceeding anyway.");
   }
 
-  await prisma.$executeRawUnsafe(DROP_SQL);
-  console.log("\nDropped unused tables and enums.");
+  await prisma.$executeRawUnsafe(DROP_UNUSED_SQL);
+  if (INCLUDE_VIDEO) {
+    await prisma.$executeRawUnsafe(DROP_VIDEO_SQL);
+  }
+  console.log("\nDropped tables and enums.");
 }
 
 main()

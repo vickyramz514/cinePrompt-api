@@ -44,17 +44,9 @@ router.post('/users/:id/block', adminController.blockUser);
 router.post('/users/:id/unblock', adminController.unblockUser);
 router.post('/users/:id/plan-override', adminController.planOverride);
 
-// Jobs
-router.get('/jobs', adminController.getJobs);
-router.get('/jobs/:id', adminController.getJobById);
-router.post('/jobs/:id/cancel', adminController.cancelJob);
-
 // Payments
 router.get('/payments', adminController.getPayments);
 router.get('/subscriptions', adminController.getSubscriptions);
-
-// Abuse
-router.get('/abuse-logs', adminController.getAbuseLogs);
 
 // Support
 router.get('/support/tickets', adminSupportController.getTickets);
