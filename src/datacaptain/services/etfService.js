@@ -24,12 +24,16 @@ function clampOffset(offset) {
 }
 
 /**
- * @param {{ limit?: number | string, offset?: number | string, search?: string }} opts
+ * @param {{ limit?: number | string, offset?: number | string, search?: string, hasPrice?: boolean | string }} opts
  */
 export async function getEtfList(opts = {}) {
   const limit = clampLimit(opts.limit);
   const offset = clampOffset(opts.offset);
   const search = (opts.search || "").trim();
+  const hasPrice =
+    opts.hasPrice === true ||
+    opts.hasPrice === "1" ||
+    opts.hasPrice === "true";
 
   const whereParts = [`s.type = 'ETF'`, `(s.is_active IS NULL OR s.is_active = true)`];
   const replacements = { limit, offset };
@@ -39,10 +43,20 @@ export async function getEtfList(opts = {}) {
     replacements.search = `%${search}%`;
   }
 
+  if (hasPrice) {
+    whereParts.push(`EXISTS (
+      SELECT 1 FROM historical_prices hp0
+      WHERE hp0.symbol = s.symbol
+      LIMIT 1
+    )`);
+  }
+
   const whereClause = whereParts.join(" AND ");
   const orderClause = search
-    ? "ORDER BY s.symbol ASC"
-    : `ORDER BY CASE WHEN s.symbol IN ('SPY','QQQ','VTI','DIA','ARKK') THEN 0 ELSE 1 END, s.symbol ASC`;
+    ? `ORDER BY CASE WHEN hp.close IS NOT NULL THEN 0 ELSE 1 END, s.symbol ASC`
+    : `ORDER BY CASE WHEN hp.close IS NOT NULL THEN 0 ELSE 1 END,
+       CASE WHEN s.symbol IN ('SPY','QQQ','VTI','DIA','ARKK') THEN 0 ELSE 1 END,
+       s.symbol ASC`;
 
   const [countRow] = await sequelize.query(
     `SELECT COUNT(*)::int AS total FROM stocks s WHERE ${whereClause}`,
@@ -74,6 +88,7 @@ export async function getEtfList(opts = {}) {
     total: countRow?.total ?? 0,
     limit,
     offset,
+    hasPrice,
   };
 }
 

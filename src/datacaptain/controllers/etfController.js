@@ -8,11 +8,12 @@ import { normalizePlanSlug } from "../config/planAccess.js";
 
 export async function getEtfList(req, res, next) {
   try {
-    const { limit, offset, search, q } = req.query;
+    const { limit, offset, search, q, hasPrice } = req.query;
     const data = await etfService.getEtfList({
       limit,
       offset,
       search: search || q,
+      hasPrice,
     });
     res.json(data);
   } catch (err) {

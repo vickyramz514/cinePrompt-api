@@ -271,6 +271,12 @@ const spec = {
           { name: "limit", in: "query", schema: { type: "integer", default: 100, maximum: 500 } },
           { name: "offset", in: "query", schema: { type: "integer", default: 0 } },
           { name: "search", in: "query", schema: { type: "string", description: "Filter by symbol or name" } },
+          {
+            name: "hasPrice",
+            in: "query",
+            schema: { type: "boolean", default: false },
+            description: "If true, only ETFs with at least one row in historical_prices",
+          },
         ],
         responses: {
           200: {
