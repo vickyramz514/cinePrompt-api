@@ -117,19 +117,6 @@ enum NotificationType {
   SYSTEM_ANNOUNCEMENT
 }
 
-enum NotificationChannel {
-  EMAIL
-  IN_APP
-  PUSH
-}
-
-enum ErrorSeverity {
-  LOW
-  MEDIUM
-  HIGH
-  CRITICAL
-}
-
 // =============================================================================
 // USER & AUTHENTICATION
 // =============================================================================
@@ -161,10 +148,7 @@ model User {
   videoJobs         VideoJob[]
   userSubscriptions UserSubscription[]
   payments          Payment[]
-  apiUsage          ApiUsage[]
   notifications     Notification[]
-  notificationPrefs NotificationPreference[]
-  auditLogs         AuditLog[]
   adminAuditLogs    AdminAuditLog[]
   supportTickets    SupportTicket[]
   referralsGiven   Referral[]    @relation("Referrer")
@@ -230,7 +214,6 @@ model Wallet {
 
   user     User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   ledger   CreditLedgerEntry[]
-  usages   CreditUsageLog[]
 
   @@index([userId])
   @@index([balance])
@@ -256,22 +239,6 @@ model CreditLedgerEntry {
   @@index([type])
   @@index([referenceId, referenceType])
   @@index([walletId, createdAt]) // Ledger history query
-}
-
-model CreditUsageLog {
-  id          String   @id @default(uuid())
-  walletId    String
-  amount      Int      // Always positive (usage amount)
-  jobId       String?
-  planId      String?
-  metadata    Json?
-  createdAt   DateTime @default(now())
-
-  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
-
-  @@index([walletId])
-  @@index([jobId])
-  @@index([createdAt])
 }
 
 // =============================================================================
@@ -320,7 +287,6 @@ model VideoJob {
 
   user     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   steps    JobStep[]
-  assets   VideoAsset[]
 
   @@index([userId])
   @@index([status])
@@ -359,26 +325,6 @@ model JobStep {
   @@index([status])
   @@index([stepType, status])
   @@index([createdAt])
-}
-
-model VideoAsset {
-  id          String   @id @default(uuid())
-  jobId       String
-  assetType   String   // "video" | "thumbnail" | "preview"
-  storageKey  String
-  url         String?
-  mimeType    String?
-  sizeBytes   Int?
-  width       Int?
-  height     Int?
-  duration   Int?
-  metadata   Json?
-  createdAt   DateTime @default(now())
-
-  job VideoJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
-
-  @@index([jobId])
-  @@index([assetType])
 }
 
 // =============================================================================
@@ -482,29 +428,6 @@ model Payment {
 }
 
 // =============================================================================
-// API USAGE & ANALYTICS
-// =============================================================================
-
-model ApiUsage {
-  id        String   @id @default(uuid())
-  userId    String
-  endpoint  String
-  method    String
-  statusCode Int?
-  durationMs Int?
-  creditsUsed Int?
-  metadata  Json?
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([endpoint])
-  @@index([createdAt])
-  @@index([userId, createdAt])
-}
-
-// =============================================================================
 // NOTIFICATIONS
 // =============================================================================
 
@@ -523,83 +446,6 @@ model Notification {
   @@index([userId])
   @@index([userId, readAt])
   @@index([createdAt])
-}
-
-model NotificationPreference {
-  id        String   @id @default(uuid())
-  userId    String
-  channel   NotificationChannel
-  type      NotificationType
-  enabled   Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, channel, type])
-  @@index([userId])
-}
-
-// =============================================================================
-// ERROR LOGGING & SYSTEM
-// =============================================================================
-
-model ErrorLog {
-  id        String   @id @default(uuid())
-  severity  ErrorSeverity @default(MEDIUM)
-  code      String?
-  message   String   @db.Text
-  stack     String?  @db.Text
-  context   Json?    // userId, jobId, requestId
-  metadata  Json?
-  createdAt DateTime @default(now())
-
-  @@index([severity])
-  @@index([code])
-  @@index([createdAt])
-}
-
-model SystemSettings {
-  id        String   @id @default(uuid())
-  key       String   @unique
-  value     Json
-  category  String?  // "billing" | "limits" | "feature_flags"
-  updatedAt DateTime @updatedAt
-
-  @@index([key])
-  @@index([category])
-}
-
-model AuditLog {
-  id         String   @id @default(uuid())
-  userId     String?
-  action     String
-  resource   String   // "user" | "job" | "subscription"
-  resourceId String?
-  oldValue   Json?
-  newValue   Json?
-  ipAddress  String?
-  userAgent  String?
-  createdAt  DateTime @default(now())
-
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([userId])
-  @@index([resource, resourceId])
-  @@index([action])
-  @@index([createdAt])
-}
-
-model SystemMetrics {
-  id        String   @id @default(uuid())
-  metric    String   // "jobs_per_minute" | "revenue_daily"
-  value     Float
-  dimensions Json?   // { "status": "completed" }
-  timestamp DateTime @default(now())
-
-  @@index([metric])
-  @@index([timestamp])
-  @@index([metric, timestamp])
 }
 
 // =============================================================================

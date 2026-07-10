@@ -22,6 +22,8 @@
     "etf:compute-metrics": "node scripts/compute-etf-metrics.js",
     "db:sync:market-prices": "node scripts/sync-market-prices-only.js",
     "db:import:dmd": "node scripts/import-dmd-batches.js",
+    "db:cleanup:unused": "node scripts/db-drop-unused-tables.js",
+    "db:cleanup:unused:apply": "node scripts/db-drop-unused-tables.js --apply",
     "razorpay:create-plans": "node scripts/create-razorpay-plans.js",
     "razorpay:link-plans": "node scripts/link-razorpay-plans.js",
     "razorpay:link-plans:test": "RAZORPAY_PLAN_MAP_MODE=test node scripts/link-razorpay-plans.js",
