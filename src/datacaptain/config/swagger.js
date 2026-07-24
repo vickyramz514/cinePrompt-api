@@ -224,12 +224,14 @@ const spec = {
     },
     "/api/market/status": {
       get: {
-        summary: "US market status (OPEN/CLOSED, next open/close times)",
+        summary: "US market status (OPEN/CLOSED, NYSE holidays & early closes)",
+        description:
+          "Computed live from America/New_York clock plus the NYSE holiday/early-close calendar. No paid data feed. Regular session 09:30–16:00 ET; early closes end at 13:00 ET.",
         tags: ["Market"],
         parameters: [{ $ref: "#/components/parameters/ApiKeyHeader" }],
         responses: {
           200: {
-            description: "Market status (cached 60s)",
+            description: "Market status (cached 30s)",
             content: {
               "application/json": {
                 schema: {
@@ -237,6 +239,14 @@ const spec = {
                   properties: {
                     market: { type: "string", example: "US" },
                     status: { type: "string", enum: ["OPEN", "CLOSED"] },
+                    session: {
+                      type: "string",
+                      enum: ["regular", "early_close", "closed", "holiday"],
+                    },
+                    holiday: { type: "string", nullable: true, example: null },
+                    earlyClose: { type: "string", nullable: true, example: null },
+                    timezone: { type: "string", example: "America/New_York" },
+                    asOf: { type: "string", format: "date-time" },
                     nextOpen: { type: "string", format: "date-time" },
                     nextClose: { type: "string", format: "date-time" },
                   },

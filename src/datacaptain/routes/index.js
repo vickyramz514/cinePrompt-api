@@ -73,10 +73,10 @@ router.get("/stocks/:symbol/dividends", stockController.getDividends);
 router.get("/stocks/:symbol/earnings", stockController.getEarnings);
 
 // Market routes
-// Market status (cached 60s)
+// Market status — NYSE calendar locally (holidays + early closes), short cache
 router.get(
   "/market/status",
-  cacheMiddleware(cacheKeys.marketStatus),
+  cacheMiddleware(cacheKeys.marketStatus, 30),
   marketStatusController.getStatus
 );
 router.get(
