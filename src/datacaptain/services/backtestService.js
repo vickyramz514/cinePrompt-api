@@ -1,13 +1,27 @@
 /**
- * Buy-and-hold backtest & portfolio comparison
+ * Multi-strategy ETF backtest & portfolio comparison
  */
 
 import { Op } from "sequelize";
 import { HistoricalPrice, Stock, Dividend } from "../models/index.js";
 import { ValidationError, NotFoundError } from "../../utils/errors.js";
+import {
+  SUPPORTED_STRATEGIES,
+  simulateBuyAndHold,
+  simulateDca,
+  simulateSmaCrossover,
+  simulateEmaCrossover,
+  simulateRsi,
+  simulateMacd,
+  simulateCustom,
+  addCalendarDays,
+} from "./backtestStrategies.js";
 
 const MAX_RANGE_YEARS = 30;
 const MAX_COMPARE_SYMBOLS = 10;
+const RISK_FREE_ANNUAL = 0.04;
+const DEFAULT_INFLATION = 0.025;
+const WARMUP_CALENDAR_DAYS = 400;
 
 function parseDate(value, label) {
   const d = new Date(value);
@@ -20,6 +34,29 @@ function parseDate(value, label) {
 function yearsBetween(start, end) {
   const ms = new Date(end).getTime() - new Date(start).getTime();
   return Math.max(ms / (365.25 * 24 * 60 * 60 * 1000), 1 / 365.25);
+}
+
+function round2(n) {
+  return Math.round(n * 100) / 100;
+}
+
+function round4pct(n) {
+  return Math.round(n * 10000) / 100;
+}
+
+function parseBool(value, defaultValue) {
+  if (value === undefined || value === null || value === "") return defaultValue;
+  if (typeof value === "boolean") return value;
+  const s = String(value).toLowerCase();
+  if (["1", "true", "yes", "on"].includes(s)) return true;
+  if (["0", "false", "no", "off"].includes(s)) return false;
+  return defaultValue;
+}
+
+function parseNum(value, fallback) {
+  if (value === undefined || value === null || value === "") return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
 }
 
 async function assertSymbol(symbol) {
@@ -100,89 +137,156 @@ async function assertEnoughPriceHistory(symbol, startDate, endDate, prices) {
   );
 }
 
-async function estimateDividendYield(symbol, startDate, endDate, startPrice) {
+async function loadDividends(symbol, startDate, endDate) {
   const dividends = await Dividend.findAll({
     where: {
       symbol: symbol.toUpperCase(),
       ex_date: { [Op.between]: [startDate, endDate] },
     },
-    attributes: ["amount"],
+    attributes: ["ex_date", "amount"],
+    order: [["ex_date", "ASC"]],
     raw: true,
   });
 
-  if (!dividends.length || !startPrice) return null;
-
-  const totalDividends = dividends.reduce((sum, d) => sum + parseFloat(d.amount), 0);
-  const years = yearsBetween(startDate, endDate);
-  const annualDividend = totalDividends / years;
-  return Math.round((annualDividend / startPrice) * 10000) / 100;
+  return dividends.map((d) => ({
+    date: formatDateOnly(d.ex_date),
+    amount: parseFloat(d.amount),
+  }));
 }
 
-function computeMetrics(prices, investment) {
-  if (prices.length < 2) {
-    throw new ValidationError("Not enough price history for this date range");
+async function estimateDividendYield(symbol, startDate, endDate, startPrice) {
+  const dividends = await loadDividends(symbol, startDate, endDate);
+  if (!dividends.length || !startPrice) return null;
+
+  const totalDividends = dividends.reduce((sum, d) => sum + d.amount, 0);
+  const years = yearsBetween(startDate, endDate);
+  const annualDividend = totalDividends / years;
+  return round4pct(annualDividend / startPrice);
+}
+
+function riskMetricsFromDailyReturns(dailyReturns) {
+  const n = dailyReturns.length;
+  if (n < 2) {
+    return { volatility: 0, sharpe: null, sortino: null };
   }
 
-  const startPrice = prices[0].close;
-  const endPrice = prices[prices.length - 1].close;
-  const startDate = prices[0].date;
-  const endDate = prices[prices.length - 1].date;
+  const mean = dailyReturns.reduce((a, b) => a + b, 0) / n;
+  const variance = dailyReturns.reduce((s, r) => s + (r - mean) ** 2, 0) / (n - 1);
+  const volatility = Math.sqrt(variance) * Math.sqrt(252);
 
-  const shares = investment / startPrice;
-  const finalValue = shares * endPrice;
-  const totalReturn = (finalValue - investment) / investment;
+  const rfDaily = RISK_FREE_ANNUAL / 252;
+  const excess = mean - rfDaily;
+  const sharpe = volatility > 0 ? (excess / Math.sqrt(variance)) * Math.sqrt(252) : null;
+
+  const downside = dailyReturns.filter((r) => r < rfDaily);
+  let sortino = null;
+  if (downside.length > 1) {
+    const downVar =
+      downside.reduce((s, r) => s + (r - rfDaily) ** 2, 0) / (downside.length - 1);
+    const downDev = Math.sqrt(downVar);
+    sortino = downDev > 0 ? (excess / downDev) * Math.sqrt(252) : null;
+  }
+
+  return {
+    volatility: round4pct(volatility),
+    sharpe: sharpe == null ? null : round2(sharpe),
+    sortino: sortino == null ? null : round2(sortino),
+  };
+}
+
+function metricsFromSimulation(sim, { adjustForInflation = false, inflationRate = DEFAULT_INFLATION, reinvestDividends = true } = {}) {
+  const { equityCurve, totalInvested, startPrice, endPrice, trades, strategyParams } = sim;
+  const startDate = equityCurve[0].date;
+  const endDate = equityCurve[equityCurve.length - 1].date;
+  const finalValue = equityCurve[equityCurve.length - 1].value;
+  const invested = totalInvested > 0 ? totalInvested : 1;
   const years = yearsBetween(startDate, endDate);
-  const annualReturn = Math.pow(1 + totalReturn, 1 / years) - 1;
 
-  let peak = prices[0].close;
+  let peakValue = equityCurve[0].value;
   let maxDrawdown = 0;
-  const equityCurve = [];
-
   const dailyReturns = [];
-  for (let i = 0; i < prices.length; i++) {
-    const p = prices[i];
-    const value = investment * (p.close / startPrice);
-    equityCurve.push({ date: p.date, value: Math.round(value * 100) / 100 });
-
-    if (p.close > peak) peak = p.close;
-    const dd = peak > 0 ? (peak - p.close) / peak : 0;
+  for (let i = 0; i < equityCurve.length; i++) {
+    const value = equityCurve[i].value;
+    if (value > peakValue) peakValue = value;
+    const dd = peakValue > 0 ? (peakValue - value) / peakValue : 0;
     if (dd > maxDrawdown) maxDrawdown = dd;
-
     if (i > 0) {
-      const prev = prices[i - 1].close;
-      if (prev > 0) dailyReturns.push((p.close - prev) / prev);
+      const prev = equityCurve[i - 1].value;
+      if (prev > 0) dailyReturns.push((value - prev) / prev);
     }
   }
 
-  const mean =
-    dailyReturns.length > 0
-      ? dailyReturns.reduce((a, b) => a + b, 0) / dailyReturns.length
-      : 0;
-  const variance =
-    dailyReturns.length > 1
-      ? dailyReturns.reduce((s, r) => s + (r - mean) ** 2, 0) / (dailyReturns.length - 1)
-      : 0;
-  const volatility = Math.sqrt(variance) * Math.sqrt(252);
-  const riskScore = Math.min(100, Math.round(volatility * 100));
+  const totalReturn = (finalValue - invested) / invested;
+  const annualReturn = Math.pow(Math.max(finalValue / invested, 1e-12), 1 / years) - 1;
+  const totalProfit = finalValue - invested;
+  const risk = riskMetricsFromDailyReturns(dailyReturns);
+
+  let inflationAdjustedFinal = finalValue;
+  let inflationAdjustedReturn = null;
+  let inflationAdjustedCagr = null;
+  if (adjustForInflation) {
+    inflationAdjustedFinal = finalValue / Math.pow(1 + inflationRate, years);
+    inflationAdjustedReturn = round4pct((inflationAdjustedFinal - invested) / invested);
+    inflationAdjustedCagr = round4pct(Math.pow(inflationAdjustedFinal / invested, 1 / years) - 1);
+  }
 
   return {
     startDate,
     endDate,
-    startPrice: Math.round(startPrice * 100) / 100,
-    endPrice: Math.round(endPrice * 100) / 100,
-    initialInvestment: investment,
-    finalValue: Math.round(finalValue * 100) / 100,
-    totalReturn: Math.round(totalReturn * 10000) / 100,
-    annualReturn: Math.round(annualReturn * 10000) / 100,
-    maxDrawdown: Math.round(maxDrawdown * 10000) / 100,
-    volatility: Math.round(volatility * 10000) / 100,
-    riskScore,
+    startPrice,
+    endPrice,
+    initialInvestment: round2(invested),
+    finalValue: round2(finalValue),
+    totalProfit: round2(totalProfit),
+    totalReturn: round4pct(totalReturn),
+    annualReturn: round4pct(annualReturn),
+    cagr: round4pct(annualReturn),
+    maxDrawdown: round4pct(maxDrawdown),
+    volatility: risk.volatility,
+    sharpe: risk.sharpe,
+    sortino: risk.sortino,
+    riskScore: Math.min(100, Math.round(risk.volatility)),
+    tradingDays: equityCurve.length,
+    years: round2(years),
+    trades,
+    reinvestDividends: Boolean(reinvestDividends),
+    adjustForInflation: Boolean(adjustForInflation),
+    inflationRate: adjustForInflation ? inflationRate : null,
+    inflationAdjustedFinalValue: adjustForInflation ? round2(inflationAdjustedFinal) : null,
+    inflationAdjustedReturn,
+    inflationAdjustedCagr,
+    strategyParams,
     equityCurve,
   };
 }
 
+function needsWarmup(strategy) {
+  return ["sma_crossover", "ema_crossover", "rsi", "macd", "custom"].includes(strategy);
+}
+
+function runStrategySimulator(strategy, rangePrices, allPrices, rangeStart, investment, opts) {
+  switch (strategy) {
+    case "buy_and_hold":
+      return simulateBuyAndHold(rangePrices, investment, opts);
+    case "dca":
+      return simulateDca(rangePrices, investment, opts);
+    case "sma_crossover":
+      return simulateSmaCrossover(allPrices, rangeStart, investment, opts);
+    case "ema_crossover":
+      return simulateEmaCrossover(allPrices, rangeStart, investment, opts);
+    case "rsi":
+      return simulateRsi(allPrices, rangeStart, investment, opts);
+    case "macd":
+      return simulateMacd(allPrices, rangeStart, investment, opts);
+    case "custom":
+      return simulateCustom(allPrices, rangeStart, investment, opts);
+    default:
+      throw new ValidationError(`Unsupported strategy: ${strategy}`);
+  }
+}
+
 /**
- * @param {{ symbol: string, investment?: number, startDate: string, endDate: string, strategy?: string }} input
+ * @param {object} input
  */
 export async function runBuyAndHoldBacktest(input) {
   const symbol = input.symbol?.toUpperCase();
@@ -202,15 +306,61 @@ export async function runBuyAndHoldBacktest(input) {
     throw new ValidationError(`Date range cannot exceed ${MAX_RANGE_YEARS} years`);
   }
 
-  const strategy = input.strategy || "buy_and_hold";
-  if (strategy !== "buy_and_hold") {
-    throw new ValidationError("Only buy_and_hold strategy is supported in this version");
+  const strategy = String(input.strategy || "buy_and_hold").toLowerCase();
+  if (!SUPPORTED_STRATEGIES.includes(strategy)) {
+    throw new ValidationError(
+      `Unsupported strategy. Use one of: ${SUPPORTED_STRATEGIES.join(", ")}`
+    );
   }
 
+  const reinvestDividends = parseBool(input.reinvestDividends, true);
+  const adjustForInflation = parseBool(input.adjustForInflation, false);
+
+  const strategyOpts = {
+    dividends: [],
+    reinvestDividends,
+    fastPeriod: parseNum(input.fastPeriod, strategy === "custom" ? 10 : strategy === "ema_crossover" ? 12 : 20),
+    slowPeriod: parseNum(input.slowPeriod, strategy === "custom" ? 30 : strategy === "ema_crossover" ? 26 : 50),
+    rsiPeriod: parseNum(input.rsiPeriod, 14),
+    rsiBuyBelow: parseNum(input.rsiBuyBelow, 30),
+    rsiSellAbove: parseNum(input.rsiSellAbove, 70),
+    macdFast: parseNum(input.macdFast, 12),
+    macdSlow: parseNum(input.macdSlow, 26),
+    macdSignal: parseNum(input.macdSignal, 9),
+  };
+
   const stock = await assertSymbol(symbol);
-  const prices = await loadPriceSeries(symbol, startDate, endDate);
-  await assertEnoughPriceHistory(symbol, startDate, endDate, prices);
-  const metrics = computeMetrics(prices, investment);
+
+  const loadFrom = needsWarmup(strategy) ? addCalendarDays(startDate, -WARMUP_CALENDAR_DAYS) : startDate;
+  const allPrices = await loadPriceSeries(symbol, loadFrom, endDate);
+  const rangeStart = allPrices.findIndex((p) => p.date >= startDate);
+  if (rangeStart < 0) {
+    await assertEnoughPriceHistory(symbol, startDate, endDate, []);
+  }
+  const rangePrices = allPrices.slice(rangeStart);
+  await assertEnoughPriceHistory(symbol, startDate, endDate, rangePrices);
+
+  const dividends = await loadDividends(
+    symbol,
+    rangePrices[0].date,
+    rangePrices[rangePrices.length - 1].date
+  );
+  strategyOpts.dividends = dividends;
+
+  const sim = runStrategySimulator(
+    strategy,
+    rangePrices,
+    allPrices,
+    rangeStart,
+    investment,
+    strategyOpts
+  );
+
+  const metrics = metricsFromSimulation(sim, {
+    adjustForInflation,
+    reinvestDividends,
+  });
+
   const dividendYield = await estimateDividendYield(
     symbol,
     metrics.startDate,
@@ -219,7 +369,7 @@ export async function runBuyAndHoldBacktest(input) {
   );
 
   return {
-    strategy: "buy_and_hold",
+    strategy,
     symbol,
     name: stock.name,
     type: stock.type,
@@ -229,7 +379,7 @@ export async function runBuyAndHoldBacktest(input) {
 }
 
 /**
- * Compare multiple symbols (e.g. VOO vs SPY vs QQQ)
+ * Compare multiple symbols with the same strategy settings.
  */
 export async function compareBuyAndHold(input) {
   const symbols = (input.symbols || [])
@@ -246,6 +396,9 @@ export async function compareBuyAndHold(input) {
   const investment = Number(input.investment ?? 10000);
   const startDate = parseDate(input.startDate, "startDate");
   const endDate = parseDate(input.endDate, "endDate");
+  const reinvestDividends = parseBool(input.reinvestDividends, true);
+  const adjustForInflation = parseBool(input.adjustForInflation, false);
+  const strategy = String(input.strategy || "buy_and_hold").toLowerCase();
 
   const results = [];
   for (const symbol of symbols) {
@@ -255,17 +408,34 @@ export async function compareBuyAndHold(input) {
         investment,
         startDate,
         endDate,
-        strategy: "buy_and_hold",
+        strategy,
+        reinvestDividends,
+        adjustForInflation,
+        fastPeriod: input.fastPeriod,
+        slowPeriod: input.slowPeriod,
+        rsiPeriod: input.rsiPeriod,
+        rsiBuyBelow: input.rsiBuyBelow,
+        rsiSellAbove: input.rsiSellAbove,
+        macdFast: input.macdFast,
+        macdSlow: input.macdSlow,
+        macdSignal: input.macdSignal,
       });
       results.push({
         symbol: row.symbol,
         name: row.name,
+        strategy: row.strategy,
         totalReturn: row.totalReturn,
         annualReturn: row.annualReturn,
+        cagr: row.cagr,
         maxDrawdown: row.maxDrawdown,
         finalValue: row.finalValue,
+        totalProfit: row.totalProfit,
         dividendYield: row.dividendYield,
         riskScore: row.riskScore,
+        sharpe: row.sharpe,
+        sortino: row.sortino,
+        volatility: row.volatility,
+        equityCurve: row.equityCurve,
       });
     } catch (err) {
       results.push({
@@ -283,6 +453,7 @@ export async function compareBuyAndHold(input) {
     investment,
     startDate,
     endDate,
+    strategy,
     results,
     winner: ranked[0]?.symbol ?? null,
     ranked: ranked.map((r) => r.symbol),

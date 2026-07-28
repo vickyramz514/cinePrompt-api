@@ -13,6 +13,16 @@ export async function runBuyAndHold(req, res, next) {
       startDate: body.startDate,
       endDate: body.endDate,
       strategy: body.strategy || "buy_and_hold",
+      reinvestDividends: body.reinvestDividends,
+      adjustForInflation: body.adjustForInflation,
+      fastPeriod: body.fastPeriod,
+      slowPeriod: body.slowPeriod,
+      rsiPeriod: body.rsiPeriod,
+      rsiBuyBelow: body.rsiBuyBelow,
+      rsiSellAbove: body.rsiSellAbove,
+      macdFast: body.macdFast,
+      macdSlow: body.macdSlow,
+      macdSignal: body.macdSignal,
     });
     res.json(data);
   } catch (err) {
@@ -33,6 +43,17 @@ export async function compareSymbols(req, res, next) {
       investment: body.investment,
       startDate: body.startDate,
       endDate: body.endDate,
+      strategy: body.strategy || "buy_and_hold",
+      reinvestDividends: body.reinvestDividends,
+      adjustForInflation: body.adjustForInflation,
+      fastPeriod: body.fastPeriod,
+      slowPeriod: body.slowPeriod,
+      rsiPeriod: body.rsiPeriod,
+      rsiBuyBelow: body.rsiBuyBelow,
+      rsiSellAbove: body.rsiSellAbove,
+      macdFast: body.macdFast,
+      macdSlow: body.macdSlow,
+      macdSignal: body.macdSignal,
     });
     res.json(data);
   } catch (err) {
