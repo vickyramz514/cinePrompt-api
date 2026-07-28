@@ -9,12 +9,14 @@ import {
   HEATMAP_BASKETS,
   VALID_PERIODS,
   resolvePeriodField,
+  periodLookbackDays,
+  ETF_STATIC_META,
 } from "../constants/etfBaskets.js";
 import { isFreePlan } from "../config/planAccess.js";
 
 const MAX_SCREENER_LIMIT = 100;
 const FREE_SCREENER_LIMIT = 10;
-const MAX_HEATMAP_SYMBOLS = 40;
+const MAX_HEATMAP_SYMBOLS = 80;
 
 function roundPct(value) {
   if (value == null || Number.isNaN(value)) return null;
@@ -225,16 +227,23 @@ function metricsRowToCell(row, periodField) {
   return {
     symbol: row.symbol,
     name: row.name ?? row.symbol,
-    returnPct: row[periodField] != null ? parseFloat(row[periodField]) : null,
+    returnPct: periodField && row[periodField] != null ? parseFloat(row[periodField]) : null,
     latestPrice: row.latest_price != null ? parseFloat(row.latest_price) : null,
     dividendYieldTtm:
       row.dividend_yield_ttm != null ? parseFloat(row.dividend_yield_ttm) : null,
     assetClass: row.asset_class ?? null,
+    returnYtd: row.return_ytd != null ? parseFloat(row.return_ytd) : null,
+    return1y: row.return_1y != null ? parseFloat(row.return_1y) : null,
+    return3y: row.return_3y != null ? parseFloat(row.return_3y) : null,
+    return5y: row.return_5y != null ? parseFloat(row.return_5y) : null,
+    volatility1y: row.volatility_1y != null ? parseFloat(row.volatility_1y) : null,
+    avgVolume30d: row.avg_volume_30d != null ? Number(row.avg_volume_30d) : null,
   };
 }
 
 async function loadMetricsRows(symbols) {
   const unique = [...new Set(symbols.map((s) => s.toUpperCase()))];
+  if (!unique.length) return [];
   const rows = await sequelize.query(
     `
     SELECT m.*, s.name
@@ -254,6 +263,110 @@ async function loadMetricsRows(symbols) {
   }
 
   return unique.map((sym) => bySymbol.get(sym)).filter(Boolean);
+}
+
+async function loadRecentPricesForSymbols(symbols, lookbackDays = 400) {
+  if (!symbols.length) return new Map();
+  const since = addDays(new Date().toISOString().slice(0, 10), -(lookbackDays + 30));
+  const rows = await HistoricalPrice.findAll({
+    where: {
+      symbol: { [Op.in]: symbols.map((s) => s.toUpperCase()) },
+      date: { [Op.gte]: since },
+    },
+    order: [
+      ["symbol", "ASC"],
+      ["date", "ASC"],
+    ],
+    attributes: ["symbol", "date", "close", "volume"],
+    raw: true,
+    limit: symbols.length * 800,
+  });
+
+  const map = new Map();
+  for (const r of rows) {
+    const sym = r.symbol;
+    if (!map.has(sym)) map.set(sym, []);
+    map.get(sym).push({
+      date: toDateStr(r.date),
+      close: parseFloat(r.close),
+      volume: r.volume ? Number(r.volume) : 0,
+    });
+  }
+  return map;
+}
+
+function enrichCellFromPrices(cell, pricesAsc, periodKey) {
+  if (!pricesAsc?.length) {
+    return {
+      ...cell,
+      return1d: null,
+      return1w: null,
+      return1m: null,
+      return3m: null,
+      return6m: null,
+      return10y: null,
+      returnMax: null,
+      sparkline: [],
+      aumBillions: ETF_STATIC_META[cell.symbol]?.aumBillions ?? null,
+      expenseRatio: ETF_STATIC_META[cell.symbol]?.expenseRatio ?? null,
+      sizeScore: cell.avgVolume30d || 1,
+    };
+  }
+
+  const latest = pricesAsc[pricesAsc.length - 1];
+  const latestDate = latest.date;
+  const computeAt = (days) => {
+    const start = priceOnOrBefore(pricesAsc, addDays(latestDate, -days));
+    return computeReturnPct(start?.close, latest.close);
+  };
+
+  const return1d =
+    pricesAsc.length >= 2
+      ? computeReturnPct(pricesAsc[pricesAsc.length - 2].close, latest.close)
+      : null;
+  const return1w = computeAt(7);
+  const return1m = computeAt(30);
+  const return3m = computeAt(91);
+  const return6m = computeAt(182);
+  const return10y = computeAt(365 * 10);
+  const returnMax = computeReturnPct(pricesAsc[0].close, latest.close);
+
+  const periodField = resolvePeriodField(periodKey);
+  let returnPct = cell.returnPct;
+  if (!periodField) {
+    if (periodKey === "1d") returnPct = return1d;
+    else if (periodKey === "1w") returnPct = return1w;
+    else if (periodKey === "1m") returnPct = return1m;
+    else if (periodKey === "3m") returnPct = return3m;
+    else if (periodKey === "6m") returnPct = return6m;
+    else if (periodKey === "10y") returnPct = return10y;
+    else if (periodKey === "max") returnPct = returnMax;
+    else if (periodKey === "ytd") returnPct = cell.returnYtd;
+  }
+
+  const sparkSrc = pricesAsc.slice(-30);
+  const sparkline = sparkSrc.map((p) => roundPct(p.close) ?? p.close);
+
+  const meta = ETF_STATIC_META[cell.symbol] || {};
+  const aumBillions = meta.aumBillions ?? null;
+  const expenseRatio = meta.expenseRatio ?? null;
+  const sizeScore = aumBillions != null ? aumBillions * 1e9 : cell.avgVolume30d || 1;
+
+  return {
+    ...cell,
+    returnPct,
+    return1d,
+    return1w,
+    return1m,
+    return3m,
+    return6m,
+    return10y,
+    returnMax,
+    sparkline,
+    aumBillions,
+    expenseRatio,
+    sizeScore,
+  };
 }
 
 export async function getHeatmap({ basket, symbols, period = "1y" }) {
@@ -277,12 +390,19 @@ export async function getHeatmap({ basket, symbols, period = "1y" }) {
     symbolList = basketMeta.symbols;
   }
 
+  symbolList = [...new Set(symbolList)].slice(0, MAX_HEATMAP_SYMBOLS);
+
   const rows = await loadMetricsRows(symbolList);
+  const lookback = Math.max(periodLookbackDays(periodKey) || 400, 400);
+  const priceMap = await loadRecentPricesForSymbols(symbolList, lookback);
+
   const cells = symbolList
     .map((sym) => {
       const row = rows.find((r) => r.symbol === sym);
       if (!row) return null;
-      return metricsRowToCell(row, periodField);
+      const base = metricsRowToCell(row, periodField || "return_1y");
+      if (!periodField) base.returnPct = null;
+      return enrichCellFromPrices(base, priceMap.get(sym) || [], periodKey);
     })
     .filter(Boolean);
 
@@ -291,7 +411,9 @@ export async function getHeatmap({ basket, symbols, period = "1y" }) {
   return {
     period: periodKey,
     asOf: toDateStr(asOf),
-    basket: basketMeta,
+    basket: basketMeta
+      ? { id: basketMeta.id, label: basketMeta.label, symbols: basketMeta.symbols }
+      : null,
     cells,
   };
 }
@@ -307,8 +429,9 @@ export async function screenEtfs(filters, plan) {
     offset = 0,
   } = filters;
 
-  const periodKey = VALID_PERIODS.has(period) ? period : "1y";
-  const periodField = resolvePeriodField(periodKey);
+  const cachedPeriods = new Set(["ytd", "1y", "3y", "5y"]);
+  const periodKey = cachedPeriods.has(period) ? period : "1y";
+  const periodField = resolvePeriodField(periodKey) || "return_1y";
 
   const isFree = isFreePlan(plan);
   const maxLimit = isFree ? FREE_SCREENER_LIMIT : MAX_SCREENER_LIMIT;
@@ -411,8 +534,9 @@ export async function rankEtfs(filters, plan) {
   } = filters;
 
   const categoryKey = RANKING_CATEGORIES.has(category) ? category : "return";
-  const periodKey = VALID_PERIODS.has(period) ? period : "1y";
-  const periodField = resolvePeriodField(periodKey);
+  const cachedPeriods = new Set(["ytd", "1y", "3y", "5y"]);
+  const periodKey = cachedPeriods.has(period) ? period : "1y";
+  const periodField = resolvePeriodField(periodKey) || "return_1y";
 
   const isFree = isFreePlan(plan);
   const maxLimit = isFree ? FREE_SCREENER_LIMIT : MAX_SCREENER_LIMIT;
