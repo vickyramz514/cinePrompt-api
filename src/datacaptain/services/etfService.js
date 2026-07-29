@@ -255,7 +255,8 @@ export async function getEtfList(opts = {}) {
       COUNT(*) FILTER (WHERE s.type = 'ETF' AND (s.is_active IS NULL OR s.is_active = true))::int AS total_etfs,
       COUNT(m.symbol)::int AS with_metrics,
       AVG(m.avg_volume_30d)::float AS avg_volume,
-      MAX(m.as_of_date) AS as_of
+      MAX(m.as_of_date) AS as_of,
+      (SELECT COUNT(*)::bigint FROM historical_prices) AS price_bars
     FROM stocks s
     LEFT JOIN etf_metrics m ON m.symbol = s.symbol
     WHERE s.type = 'ETF' AND (s.is_active IS NULL OR s.is_active = true)
@@ -291,6 +292,7 @@ export async function getEtfList(opts = {}) {
     stats: {
       totalEtfs: statsRow?.total_etfs ?? 0,
       withHistory: statsRow?.with_metrics ?? 0,
+      priceBars: Number(statsRow?.price_bars ?? 0),
       categories: Object.keys(HEATMAP_BASKETS).length,
       avgVolume: statsRow?.avg_volume != null ? Math.round(statsRow.avg_volume) : null,
       asOf: statsRow?.as_of ?? null,
