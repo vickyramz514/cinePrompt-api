@@ -8,12 +8,23 @@ import { normalizePlanSlug } from "../config/planAccess.js";
 
 export async function getEtfList(req, res, next) {
   try {
-    const { limit, offset, search, q, hasPrice } = req.query;
+    const q = req.query;
     const data = await etfService.getEtfList({
-      limit,
-      offset,
-      search: search || q,
-      hasPrice,
+      limit: q.limit,
+      offset: q.offset,
+      search: q.search || q.q,
+      hasPrice: q.hasPrice,
+      category: q.category || q.basket,
+      issuer: q.issuer,
+      assetClass: q.assetClass,
+      leveraged: q.leveraged,
+      inverse: q.inverse,
+      dividendMin: q.dividendMin,
+      expenseMax: q.expenseMax,
+      aumMin: q.aumMin,
+      volumeMin: q.volumeMin,
+      sort: q.sort,
+      sortDir: q.sortDir,
     });
     res.json(data);
   } catch (err) {

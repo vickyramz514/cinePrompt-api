@@ -52,8 +52,10 @@ export const cacheKeys = {
     const s = (req.query.symbols || "").replace(/\s/g, "");
     return s ? `batch:prices:${s}` : null;
   },
-  etfList: (req) =>
-    `etf:list:${req.query.limit || 100}:${req.query.offset || 0}:${(req.query.search || req.query.q || "").toLowerCase()}`,
+  etfList: (req) => {
+    const q = req.query;
+    return `etf:list:${q.limit || 100}:${q.offset || 0}:${(q.search || q.q || "").toLowerCase()}:${q.hasPrice || ""}:${q.category || q.basket || ""}:${q.issuer || ""}:${q.sort || ""}:${q.sortDir || ""}:${q.leveraged || ""}:${q.inverse || ""}:${q.dividendMin || ""}:${q.expenseMax || ""}:${q.aumMin || ""}`;
+  },
   etfHeatmap: (req) =>
     `etf:heatmap:${req.query.basket || ""}:${req.query.symbols || ""}:${req.query.period || "1y"}`,
   etfHeatmapBaskets: () => "etf:heatmap:baskets",
