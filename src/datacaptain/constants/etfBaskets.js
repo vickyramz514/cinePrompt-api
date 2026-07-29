@@ -144,6 +144,70 @@ export const ETF_STATIC_META = {
   SUSA: { aumBillions: 3.5, expenseRatio: 0.25 },
 };
 
+/** Infer issuer from common ETF name / ticker patterns */
+export function inferIssuer(symbol, name = "") {
+  const n = (name || "").toLowerCase();
+  const s = (symbol || "").toUpperCase();
+  if (n.includes("vanguard") || ["VOO", "VTI", "VUG", "VTV", "VGT", "VYM", "VIG", "VXUS", "VEA", "VWO", "BND", "ESGV", "VHT", "VFH", "VDE", "VPU", "VEU"].includes(s))
+    return "Vanguard";
+  if (n.includes("ishares") || ["IVV", "IEFA", "IEMG", "IWF", "IWD", "ITOT", "AGG", "IWM", "EFA", "EEM", "HYG", "LQD", "TIP", "IEF", "SHY", "IXUS"].includes(s))
+    return "iShares";
+  if (n.includes("spdr") || n.includes("state street") || ["SPY", "XLK", "XLF", "XLE", "XLV", "XLI", "XLY", "XLP", "XLU", "XLB", "XLRE", "XLC", "DIA", "GLD", "MDY", "SPYD"].includes(s))
+    return "State Street";
+  if (n.includes("invesco") || ["QQQ", "RSP", "QQQM"].includes(s)) return "Invesco";
+  if (n.includes("schwab") || s.startsWith("SCH")) return "Schwab";
+  if (n.includes("ark") || s.startsWith("ARK")) return "ARK";
+  if (n.includes("proshares") || ["TQQQ", "SQQQ", "UPRO", "SH", "PSQ", "SDS", "SPXU"].includes(s)) return "ProShares";
+  if (n.includes("direxion") || ["SOXL", "TNA", "SPXL", "TECL", "TZA"].includes(s)) return "Direxion";
+  return "Other";
+}
+
+/** Primary category badge from basket membership */
+export function classifyEtf(symbol) {
+  const s = (symbol || "").toUpperCase();
+  const badges = [];
+  const inBasket = (id) => HEATMAP_BASKETS[id]?.symbols?.includes(s);
+
+  if (inBasket("leveraged")) badges.push("Leveraged");
+  if (inBasket("inverse")) badges.push("Inverse");
+  if (inBasket("esg")) badges.push("ESG");
+  if (inBasket("bonds")) badges.push("Bond ETF");
+  if (inBasket("dividend")) badges.push("Dividend ETF");
+  if (inBasket("technology")) badges.push("Technology ETF");
+  if (inBasket("broad")) badges.push("Broad Market");
+  if (inBasket("sector") || inBasket("healthcare") || inBasket("financial") || inBasket("energy") || inBasket("utilities"))
+    badges.push("Sector ETF");
+  if (inBasket("international") || inBasket("emerging")) badges.push("International");
+  if (inBasket("growth")) badges.push("Growth");
+  if (inBasket("commodity")) badges.push("Commodity");
+
+  let category = "Equity";
+  if (inBasket("bonds")) category = "Bond";
+  else if (inBasket("commodity")) category = "Commodity";
+  else if (inBasket("technology")) category = "Technology";
+  else if (inBasket("dividend")) category = "Dividend";
+  else if (inBasket("international") || inBasket("emerging")) category = "International";
+  else if (inBasket("growth")) category = "Growth";
+  else if (inBasket("leveraged")) category = "Leveraged";
+  else if (inBasket("inverse")) category = "Inverse";
+  else if (inBasket("broad")) category = "Broad Market";
+  else if (inBasket("sector")) category = "Sector";
+
+  return {
+    category,
+    badges: [...new Set(badges)],
+    leveraged: inBasket("leveraged"),
+    inverse: inBasket("inverse"),
+    esg: inBasket("esg"),
+  };
+}
+
+export function symbolsForCategory(categoryId) {
+  if (!categoryId) return null;
+  if (HEATMAP_BASKETS[categoryId]) return HEATMAP_BASKETS[categoryId].symbols;
+  return null;
+}
+
 export const VALID_PERIODS = new Set([
   "1d",
   "1w",

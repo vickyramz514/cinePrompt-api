@@ -42,15 +42,37 @@ export async function getEtfHeatmapBaskets(req, res, next) {
 export async function getEtfScreener(req, res, next) {
   try {
     const plan = normalizePlanSlug(req.apiUser?.plan);
+    const q = req.query;
     const data = await etfMetricsService.screenEtfs(
       {
-        returnMin: req.query.returnMin,
-        dividendYieldMin: req.query.dividendYieldMin,
-        period: req.query.period,
-        assetClass: req.query.assetClass,
-        sort: req.query.sort,
-        limit: req.query.limit,
-        offset: req.query.offset,
+        returnMin: q.returnMin,
+        returnMax: q.returnMax,
+        dividendYieldMin: q.dividendYieldMin,
+        dividendYieldMax: q.dividendYieldMax,
+        volatilityMin: q.volatilityMin,
+        volatilityMax: q.volatilityMax,
+        volumeMin: q.volumeMin,
+        volumeMax: q.volumeMax,
+        priceMin: q.priceMin,
+        priceMax: q.priceMax,
+        expenseMin: q.expenseMin,
+        expenseMax: q.expenseMax,
+        aumMin: q.aumMin,
+        aumMax: q.aumMax,
+        sharpeMin: q.sharpeMin,
+        period: q.period,
+        assetClass: q.assetClass,
+        category: q.category,
+        issuer: q.issuer,
+        search: q.search || q.q,
+        leveraged: q.leveraged,
+        inverse: q.inverse,
+        esg: q.esg,
+        sort: q.sort,
+        sortDir: q.sortDir,
+        limit: q.limit,
+        offset: q.offset,
+        includeSparkline: q.includeSparkline,
       },
       plan
     );

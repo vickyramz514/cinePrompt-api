@@ -11,12 +11,16 @@ import {
   resolvePeriodField,
   periodLookbackDays,
   ETF_STATIC_META,
+  inferIssuer,
+  classifyEtf,
+  symbolsForCategory,
 } from "../constants/etfBaskets.js";
 import { isFreePlan } from "../config/planAccess.js";
 
 const MAX_SCREENER_LIMIT = 100;
 const FREE_SCREENER_LIMIT = 10;
 const MAX_HEATMAP_SYMBOLS = 80;
+const SCREENER_POOL_CAP = 800;
 
 function roundPct(value) {
   if (value == null || Number.isNaN(value)) return null;
@@ -421,12 +425,33 @@ export async function getHeatmap({ basket, symbols, period = "1y" }) {
 export async function screenEtfs(filters, plan) {
   const {
     returnMin,
+    returnMax,
     dividendYieldMin,
+    dividendYieldMax,
+    volatilityMin,
+    volatilityMax,
+    volumeMin,
+    volumeMax,
+    priceMin,
+    priceMax,
+    expenseMin,
+    expenseMax,
+    aumMin,
+    aumMax,
+    sharpeMin,
     period = "1y",
     assetClass,
+    category,
+    issuer,
+    search,
+    leveraged,
+    inverse,
+    esg,
     sort = "return",
+    sortDir = "desc",
     limit = 50,
     offset = 0,
+    includeSparkline = "1",
   } = filters;
 
   const cachedPeriods = new Set(["ytd", "1y", "3y", "5y"]);
@@ -439,41 +464,91 @@ export async function screenEtfs(filters, plan) {
   const offsetVal = isFree ? 0 : Math.max(parseInt(offset, 10) || 0, 0);
 
   const whereParts = [`s.type = 'ETF'`, `(s.is_active IS NULL OR s.is_active = true)`];
-  const replacements = { limit: limitVal, offset: offsetVal };
+  const replacements = {};
 
   if (returnMin != null && returnMin !== "") {
     whereParts.push(`m.${periodField} >= :returnMin`);
     replacements.returnMin = parseFloat(returnMin);
   }
+  if (returnMax != null && returnMax !== "") {
+    whereParts.push(`m.${periodField} <= :returnMax`);
+    replacements.returnMax = parseFloat(returnMax);
+  }
   if (dividendYieldMin != null && dividendYieldMin !== "") {
     whereParts.push(`m.dividend_yield_ttm >= :dividendYieldMin`);
     replacements.dividendYieldMin = parseFloat(dividendYieldMin);
+  }
+  if (dividendYieldMax != null && dividendYieldMax !== "") {
+    whereParts.push(`m.dividend_yield_ttm <= :dividendYieldMax`);
+    replacements.dividendYieldMax = parseFloat(dividendYieldMax);
+  }
+  if (volatilityMin != null && volatilityMin !== "") {
+    whereParts.push(`m.volatility_1y >= :volatilityMin`);
+    replacements.volatilityMin = parseFloat(volatilityMin);
+  }
+  if (volatilityMax != null && volatilityMax !== "") {
+    whereParts.push(`m.volatility_1y <= :volatilityMax`);
+    replacements.volatilityMax = parseFloat(volatilityMax);
+  }
+  if (volumeMin != null && volumeMin !== "") {
+    whereParts.push(`m.avg_volume_30d >= :volumeMin`);
+    replacements.volumeMin = parseFloat(volumeMin);
+  }
+  if (volumeMax != null && volumeMax !== "") {
+    whereParts.push(`m.avg_volume_30d <= :volumeMax`);
+    replacements.volumeMax = parseFloat(volumeMax);
+  }
+  if (priceMin != null && priceMin !== "") {
+    whereParts.push(`m.latest_price >= :priceMin`);
+    replacements.priceMin = parseFloat(priceMin);
+  }
+  if (priceMax != null && priceMax !== "") {
+    whereParts.push(`m.latest_price <= :priceMax`);
+    replacements.priceMax = parseFloat(priceMax);
   }
   if (assetClass) {
     whereParts.push(`m.asset_class ILIKE :assetClass`);
     replacements.assetClass = `%${assetClass}%`;
   }
+  if (search) {
+    whereParts.push(`(s.symbol ILIKE :search OR s.name ILIKE :search)`);
+    replacements.search = `%${String(search).trim()}%`;
+  }
 
-  const sortColumn =
-    sort === "yield"
-      ? "m.dividend_yield_ttm"
-      : sort === "volatility"
-        ? "m.volatility_1y"
-        : `m.${periodField}`;
+  const categorySymbols = symbolsForCategory(category);
+  if (categorySymbols?.length) {
+    whereParts.push(`m.symbol IN (:categorySymbols)`);
+    replacements.categorySymbols = categorySymbols;
+  }
+  if (leveraged === "1" || leveraged === "true") {
+    whereParts.push(`m.symbol IN (:leveragedSymbols)`);
+    replacements.leveragedSymbols = HEATMAP_BASKETS.leveraged.symbols;
+  }
+  if (inverse === "1" || inverse === "true") {
+    whereParts.push(`m.symbol IN (:inverseSymbols)`);
+    replacements.inverseSymbols = HEATMAP_BASKETS.inverse.symbols;
+  }
+  if (esg === "1" || esg === "true") {
+    whereParts.push(`m.symbol IN (:esgSymbols)`);
+    replacements.esgSymbols = HEATMAP_BASKETS.esg.symbols;
+  }
 
+  const sqlSortMap = {
+    return: `m.${periodField}`,
+    yield: "m.dividend_yield_ttm",
+    volatility: "m.volatility_1y",
+    volume: "m.avg_volume_30d",
+    price: "m.latest_price",
+    symbol: "m.symbol",
+    name: "s.name",
+  };
+  const needsMetaSort = ["expense", "aum", "sharpe", "issuer", "category"].includes(sort);
+  const sortColumn = sqlSortMap[sort] || `m.${periodField}`;
+  const dir = String(sortDir).toLowerCase() === "asc" ? "ASC" : "DESC";
   const whereClause = whereParts.join(" AND ");
 
-  const [countRow] = await sequelize.query(
-    `
-    SELECT COUNT(*)::int AS total
-    FROM etf_metrics m
-    INNER JOIN stocks s ON s.symbol = m.symbol
-    WHERE ${whereClause}
-    `,
-    { replacements, type: QueryTypes.SELECT }
-  );
-
-  const rows = await sequelize.query(
+  // Pull a pool then enrich/filter/paginate in memory for meta fields
+  const poolRows = await sequelize.query(
     `
     SELECT m.symbol, s.name, m.latest_price, m.as_of_date,
       m.return_ytd, m.return_1y, m.return_3y, m.return_5y,
@@ -481,30 +556,148 @@ export async function screenEtfs(filters, plan) {
     FROM etf_metrics m
     INNER JOIN stocks s ON s.symbol = m.symbol
     WHERE ${whereClause}
-    ORDER BY ${sortColumn} DESC NULLS LAST, m.symbol ASC
-    LIMIT :limit OFFSET :offset
+    ORDER BY ${sortColumn} ${dir} NULLS LAST, m.symbol ASC
+    LIMIT ${SCREENER_POOL_CAP}
     `,
     { replacements, type: QueryTypes.SELECT }
   );
 
-  return {
-    period: periodKey,
-    data: rows.map((r) => ({
-      symbol: r.symbol,
-      name: r.name,
+  let enriched = poolRows.map((r) => {
+    const symbol = r.symbol;
+    const name = r.name;
+    const meta = ETF_STATIC_META[symbol] || {};
+    const cls = classifyEtf(symbol);
+    const return1y = r.return_1y != null ? parseFloat(r.return_1y) : null;
+    const return3y = r.return_3y != null ? parseFloat(r.return_3y) : null;
+    const return5y = r.return_5y != null ? parseFloat(r.return_5y) : null;
+    const volatility1y = r.volatility_1y != null ? parseFloat(r.volatility_1y) : null;
+    const sharpeRatio =
+      return1y != null && volatility1y != null && volatility1y > 0
+        ? roundPct(return1y / volatility1y)
+        : null;
+    // Approximate CAGR from multi-year cumulative returns
+    const cagr3y =
+      return3y != null ? roundPct((Math.pow(1 + return3y / 100, 1 / 3) - 1) * 100) : null;
+    const periodReturn =
+      periodKey === "ytd"
+        ? r.return_ytd != null
+          ? parseFloat(r.return_ytd)
+          : null
+        : periodKey === "3y"
+          ? return3y
+          : periodKey === "5y"
+            ? return5y
+            : return1y;
+
+    return {
+      symbol,
+      name,
       latestPrice: r.latest_price != null ? parseFloat(r.latest_price) : null,
       asOf: toDateStr(r.as_of_date),
       returnYtd: r.return_ytd != null ? parseFloat(r.return_ytd) : null,
-      return1y: r.return_1y != null ? parseFloat(r.return_1y) : null,
-      return3y: r.return_3y != null ? parseFloat(r.return_3y) : null,
-      return5y: r.return_5y != null ? parseFloat(r.return_5y) : null,
+      return1y,
+      return3y,
+      return5y,
+      returnPct: periodReturn,
+      cagr: cagr3y ?? return1y,
       dividendYieldTtm:
         r.dividend_yield_ttm != null ? parseFloat(r.dividend_yield_ttm) : null,
-      volatility1y: r.volatility_1y != null ? parseFloat(r.volatility_1y) : null,
+      volatility1y,
       avgVolume30d: r.avg_volume_30d ? Number(r.avg_volume_30d) : null,
       assetClass: r.asset_class ?? null,
-    })),
-    total: countRow?.total ?? 0,
+      aumBillions: meta.aumBillions ?? null,
+      expenseRatio: meta.expenseRatio ?? null,
+      sharpeRatio,
+      issuer: inferIssuer(symbol, name),
+      category: cls.category,
+      badges: cls.badges,
+      leveraged: cls.leveraged,
+      inverse: cls.inverse,
+      esg: cls.esg,
+      country: "US",
+      currency: "USD",
+      sparkline: [],
+    };
+  });
+
+  const numOrNull = (v) => (v == null || v === "" ? null : parseFloat(v));
+  const eMin = numOrNull(expenseMin);
+  const eMax = numOrNull(expenseMax);
+  const aMin = numOrNull(aumMin);
+  const aMax = numOrNull(aumMax);
+  const sMin = numOrNull(sharpeMin);
+
+  if (eMin != null) enriched = enriched.filter((r) => r.expenseRatio != null && r.expenseRatio >= eMin);
+  if (eMax != null) enriched = enriched.filter((r) => r.expenseRatio != null && r.expenseRatio <= eMax);
+  if (aMin != null) enriched = enriched.filter((r) => r.aumBillions != null && r.aumBillions >= aMin);
+  if (aMax != null) enriched = enriched.filter((r) => r.aumBillions != null && r.aumBillions <= aMax);
+  if (sMin != null) enriched = enriched.filter((r) => r.sharpeRatio != null && r.sharpeRatio >= sMin);
+  if (issuer) {
+    const i = String(issuer).toLowerCase();
+    enriched = enriched.filter((r) => r.issuer.toLowerCase().includes(i));
+  }
+  if (search) {
+    const q = String(search).trim().toLowerCase();
+    enriched = enriched.filter(
+      (r) =>
+        r.symbol.toLowerCase().includes(q) ||
+        r.name.toLowerCase().includes(q) ||
+        r.issuer.toLowerCase().includes(q) ||
+        r.category.toLowerCase().includes(q) ||
+        (r.badges || []).some((b) => b.toLowerCase().includes(q))
+    );
+  }
+
+  if (needsMetaSort) {
+    const asc = dir === "ASC";
+    enriched.sort((a, b) => {
+      const pick = (row) => {
+        if (sort === "expense") return row.expenseRatio;
+        if (sort === "aum") return row.aumBillions;
+        if (sort === "sharpe") return row.sharpeRatio;
+        if (sort === "issuer") return row.issuer;
+        if (sort === "category") return row.category;
+        return row.returnPct;
+      };
+      const av = pick(a);
+      const bv = pick(b);
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (typeof av === "string") return asc ? av.localeCompare(bv) : bv.localeCompare(av);
+      return asc ? av - bv : bv - av;
+    });
+  }
+
+  const total = enriched.length;
+  const page = enriched.slice(offsetVal, offsetVal + limitVal);
+
+  if (includeSparkline !== "0" && page.length) {
+    try {
+      const priceMap = await loadRecentPricesForSymbols(
+        page.map((r) => r.symbol),
+        60
+      );
+      for (const row of page) {
+        const prices = priceMap.get(row.symbol) || [];
+        row.sparkline = prices.slice(-30).map((p) => p.close);
+        if (prices.length >= 2) {
+          const last = prices[prices.length - 1].close;
+          const prev = prices[prices.length - 2].close;
+          row.return1d = computeReturnPct(prev, last);
+          const mStart = priceOnOrBefore(prices, addDays(prices[prices.length - 1].date, -30));
+          row.return1m = computeReturnPct(mStart?.close, last);
+        }
+      }
+    } catch {
+      /* sparklines optional */
+    }
+  }
+
+  return {
+    period: periodKey,
+    data: page,
+    total,
     limit: limitVal,
     offset: offsetVal,
     freeTierLimited: isFree,
