@@ -16,7 +16,11 @@ export async function getUsage(req, res, next) {
       });
     }
 
-    const data = await developerUsageService.getUsageStats(keyId, dailyLimit);
+    const data = await developerUsageService.getUsageStats(
+      keyId,
+      dailyLimit,
+      req.apiUser
+    );
     res.json(data);
   } catch (err) {
     next(err);
