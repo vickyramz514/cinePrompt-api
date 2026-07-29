@@ -35,18 +35,29 @@ npm run datacaptain:db:seed     # Seed API key
 
 ## API Paths (under /api)
 
-- /api/stocks/prices, /api/stocks/:symbol/snapshot, /api/stocks/:symbol/news, /api/stocks/:symbol/price, etc.
-- /api/market/earnings-calendar
-- /api/market/status, /api/market/top-gainers, etc.
-- /api/developer/usage
-- /api/etf/list, /api/etf/:symbol
-- /api/backtest/buy-and-hold, /api/backtest/compare (paid)
-- /api/options/:symbol
-- /api/insiders/:symbol
-- /api/sentiment/:symbol
-- /api/economy/indicators
-- /api/darkpool/:symbol
-- /api/search, /api/screener, /api/indicators/:symbol, /api/ai/stock-score/:symbol
+### Free plan
+- `/api/developer/usage`
+- `/api/market/status`
+- `/api/stocks/prices`
+- `/api/stocks/:symbol/history`
+- `/api/etf/list`, `/api/etf/:symbol`
+- `/api/etf/heatmap`, `/api/etf/heatmap/baskets`
+- `/api/etf/screener`, `/api/etf/rankings` (top 10 on Free)
+
+### Paid plan (Starter+)
+- `/api/backtest/buy-and-hold` (GET/POST) — strategies: buy_and_hold, dca, sma_crossover, ema_crossover, rsi, macd, custom
+- `/api/backtest/compare` (GET/POST)
+- `/api/portfolio/rebalance` (GET/POST)
+- `/api/options/:symbol`, `/api/insiders/:symbol`, `/api/sentiment/:symbol`
+- `/api/economy/indicators`, `/api/darkpool/:symbol`
+- Other stock/market endpoints (snapshot, news, screener, indicators, AI score, etc.)
+
+### Also available (plan-gated per path)
+- `/api/stocks/:symbol/price`, `/candles`, `/profile`, `/dividends`, `/earnings`, `/snapshot`, `/news`
+- `/api/market/earnings-calendar`, `/top-gainers`, `/top-losers`, `/most-active`
+- `/api/search`, `/api/screener`, `/api/indicators/:symbol`, `/api/ai/stock-score/:symbol`
+
+OpenAPI: see `config/swagger.js` (served via API docs UI when enabled).
 
 ## WebSocket
 
