@@ -61,8 +61,10 @@ export const cacheKeys = {
     const q = req.query;
     return `etf:screener:${q.period || "1y"}:${q.search || ""}:${q.returnMin || ""}:${q.returnMax || ""}:${q.dividendYieldMin || ""}:${q.dividendYieldMax || ""}:${q.volatilityMin || ""}:${q.volatilityMax || ""}:${q.volumeMin || ""}:${q.priceMin || ""}:${q.expenseMax || ""}:${q.aumMin || ""}:${q.sharpeMin || ""}:${q.assetClass || ""}:${q.category || ""}:${q.issuer || ""}:${q.leveraged || ""}:${q.inverse || ""}:${q.esg || ""}:${q.sort || "return"}:${q.sortDir || "desc"}:${q.limit || 50}:${q.offset || 0}`;
   },
-  etfRankings: (req) =>
-    `etf:rankings:${req.query.category || "return"}:${req.query.period || "1y"}:${req.query.assetClass || ""}:${req.query.limit || 20}:${req.query.offset || 0}`,
+  etfRankings: (req) => {
+    const q = req.query;
+    return `etf:rankings:${q.metric || q.category || "return"}:${q.period || "1y"}:${q.basket || ""}:${q.search || ""}:${q.assetClass || ""}:${q.sort || ""}:${q.sortDir || ""}:${q.limit || 20}:${q.offset || 0}`;
+  },
   etfSymbol: (req) => `etf:${req.params.symbol}`,
   optionsChain: (req) =>
     `options:${req.params.symbol}:${req.query.expirationDate || "all"}:${req.query.limit || 50}`,

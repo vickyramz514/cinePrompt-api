@@ -712,24 +712,90 @@ export function listHeatmapBaskets() {
   }));
 }
 
-const RANKING_CATEGORIES = new Set(["return", "yield", "volatility"]);
+const RANKING_METRICS = new Set([
+  "return",
+  "yield",
+  "volatility",
+  "cagr",
+  "sharpe",
+  "expense",
+  "aum",
+  "drawdown",
+]);
+
+function approxMaxDrawdown(prices) {
+  if (!prices?.length) return null;
+  let peak = prices[0];
+  let maxDd = 0;
+  for (const p of prices) {
+    if (p > peak) peak = p;
+    if (peak > 0) {
+      const dd = ((peak - p) / peak) * 100;
+      if (dd > maxDd) maxDd = dd;
+    }
+  }
+  return roundPct(maxDd);
+}
+
+function metricValue(row, metric, periodKey) {
+  switch (metric) {
+    case "yield":
+      return row.dividendYieldTtm;
+    case "volatility":
+      return row.volatility1y;
+    case "cagr":
+      return row.cagr;
+    case "sharpe":
+      return row.sharpeRatio;
+    case "expense":
+      return row.expenseRatio;
+    case "aum":
+      return row.aumBillions;
+    case "drawdown":
+      return row.maxDrawdown;
+    case "return":
+    default:
+      if (periodKey === "ytd") return row.returnYtd;
+      if (periodKey === "3y") return row.return3y;
+      if (periodKey === "5y") return row.return5y;
+      return row.return1y;
+  }
+}
+
+function sortAscForMetric(metric) {
+  return metric === "volatility" || metric === "expense" || metric === "drawdown";
+}
 
 /**
- * Leaderboard rankings — top ETFs by return, yield, or lowest volatility.
+ * Leaderboard rankings — enriched ETF leaderboard with multiple metrics.
  */
 export async function rankEtfs(filters, plan) {
   const {
-    category = "return",
+    category,
+    metric: metricRaw,
     period = "1y",
     assetClass,
+    basket,
+    search,
+    sort,
+    sortDir,
     limit = 20,
     offset = 0,
+    includeSparkline = "1",
   } = filters;
 
-  const categoryKey = RANKING_CATEGORIES.has(category) ? category : "return";
+  // Back-compat: older clients send category=return|yield|volatility as the metric
+  const legacyMetric = ["return", "yield", "volatility"].includes(category) ? category : null;
+  const metricKey = RANKING_METRICS.has(metricRaw)
+    ? metricRaw
+    : legacyMetric || (RANKING_METRICS.has(category) ? category : "return");
+
+  const basketId = basket || (HEATMAP_BASKETS[category] ? category : null);
+
   const cachedPeriods = new Set(["ytd", "1y", "3y", "5y"]);
   const periodKey = cachedPeriods.has(period) ? period : "1y";
   const periodField = resolvePeriodField(periodKey) || "return_1y";
+  const prevPeriodKey = periodKey === "ytd" ? "1y" : periodKey === "1y" ? "ytd" : periodKey === "3y" ? "1y" : "3y";
 
   const isFree = isFreePlan(plan);
   const maxLimit = isFree ? FREE_SCREENER_LIMIT : MAX_SCREENER_LIMIT;
@@ -737,42 +803,27 @@ export async function rankEtfs(filters, plan) {
   const offsetVal = isFree ? 0 : Math.max(parseInt(offset, 10) || 0, 0);
 
   const whereParts = [`s.type = 'ETF'`, `(s.is_active IS NULL OR s.is_active = true)`];
-  const replacements = { limit: limitVal, offset: offsetVal };
-
-  if (categoryKey === "yield") {
-    whereParts.push(`m.dividend_yield_ttm IS NOT NULL`);
-  } else if (categoryKey === "volatility") {
-    whereParts.push(`m.volatility_1y IS NOT NULL`);
-  } else {
-    whereParts.push(`m.${periodField} IS NOT NULL`);
-  }
+  const replacements = {};
 
   if (assetClass) {
     whereParts.push(`m.asset_class ILIKE :assetClass`);
     replacements.assetClass = `%${assetClass}%`;
   }
 
-  const sortColumn =
-    categoryKey === "yield"
-      ? "m.dividend_yield_ttm"
-      : categoryKey === "volatility"
-        ? "m.volatility_1y"
-        : `m.${periodField}`;
+  const basketSymbols = symbolsForCategory(basketId);
+  if (basketSymbols?.length) {
+    whereParts.push(`m.symbol IN (:basketSymbols)`);
+    replacements.basketSymbols = basketSymbols;
+  }
 
-  const sortOrder = categoryKey === "volatility" ? "ASC" : "DESC";
+  if (search) {
+    whereParts.push(`(s.symbol ILIKE :search OR s.name ILIKE :search)`);
+    replacements.search = `%${String(search).trim()}%`;
+  }
+
   const whereClause = whereParts.join(" AND ");
 
-  const [countRow] = await sequelize.query(
-    `
-    SELECT COUNT(*)::int AS total
-    FROM etf_metrics m
-    INNER JOIN stocks s ON s.symbol = m.symbol
-    WHERE ${whereClause}
-    `,
-    { replacements, type: QueryTypes.SELECT }
-  );
-
-  const rows = await sequelize.query(
+  const poolRows = await sequelize.query(
     `
     SELECT m.symbol, s.name, m.latest_price, m.as_of_date,
       m.return_ytd, m.return_1y, m.return_3y, m.return_5y,
@@ -780,32 +831,190 @@ export async function rankEtfs(filters, plan) {
     FROM etf_metrics m
     INNER JOIN stocks s ON s.symbol = m.symbol
     WHERE ${whereClause}
-    ORDER BY ${sortColumn} ${sortOrder} NULLS LAST, m.symbol ASC
-    LIMIT :limit OFFSET :offset
+    ORDER BY m.${periodField} DESC NULLS LAST, m.symbol ASC
+    LIMIT ${SCREENER_POOL_CAP}
     `,
     { replacements, type: QueryTypes.SELECT }
   );
 
-  return {
-    category: categoryKey,
-    period: periodKey,
-    data: rows.map((r, i) => ({
-      rank: offsetVal + i + 1,
-      symbol: r.symbol,
-      name: r.name,
+  let enriched = poolRows.map((r) => {
+    const symbol = r.symbol;
+    const name = r.name;
+    const meta = ETF_STATIC_META[symbol] || {};
+    const cls = classifyEtf(symbol);
+    const return1y = r.return_1y != null ? parseFloat(r.return_1y) : null;
+    const return3y = r.return_3y != null ? parseFloat(r.return_3y) : null;
+    const return5y = r.return_5y != null ? parseFloat(r.return_5y) : null;
+    const volatility1y = r.volatility_1y != null ? parseFloat(r.volatility_1y) : null;
+    const sharpeRatio =
+      return1y != null && volatility1y != null && volatility1y > 0
+        ? roundPct(return1y / volatility1y)
+        : null;
+    const cagr =
+      return3y != null ? roundPct((Math.pow(1 + return3y / 100, 1 / 3) - 1) * 100) : return1y;
+
+    return {
+      symbol,
+      name,
       latestPrice: r.latest_price != null ? parseFloat(r.latest_price) : null,
       asOf: toDateStr(r.as_of_date),
       returnYtd: r.return_ytd != null ? parseFloat(r.return_ytd) : null,
-      return1y: r.return_1y != null ? parseFloat(r.return_1y) : null,
-      return3y: r.return_3y != null ? parseFloat(r.return_3y) : null,
-      return5y: r.return_5y != null ? parseFloat(r.return_5y) : null,
+      return1y,
+      return3y,
+      return5y,
+      cagr,
       dividendYieldTtm:
         r.dividend_yield_ttm != null ? parseFloat(r.dividend_yield_ttm) : null,
-      volatility1y: r.volatility_1y != null ? parseFloat(r.volatility_1y) : null,
+      volatility1y,
       avgVolume30d: r.avg_volume_30d ? Number(r.avg_volume_30d) : null,
       assetClass: r.asset_class ?? null,
-    })),
-    total: countRow?.total ?? 0,
+      aumBillions: meta.aumBillions ?? null,
+      expenseRatio: meta.expenseRatio ?? null,
+      sharpeRatio,
+      maxDrawdown: null,
+      issuer: inferIssuer(symbol, name),
+      category: cls.category,
+      badges: cls.badges,
+      leveraged: cls.leveraged,
+      inverse: cls.inverse,
+      esg: cls.esg,
+      country: "US",
+      currency: "USD",
+      sparkline: [],
+    };
+  });
+
+  if (search) {
+    const q = String(search).trim().toLowerCase();
+    enriched = enriched.filter(
+      (r) =>
+        r.symbol.toLowerCase().includes(q) ||
+        r.name.toLowerCase().includes(q) ||
+        r.issuer.toLowerCase().includes(q) ||
+        r.category.toLowerCase().includes(q)
+    );
+  }
+
+  // Sparklines + drawdown for ranking pool (capped for cost)
+  const sparkPool = enriched.slice(0, Math.min(enriched.length, 200));
+  if (includeSparkline !== "0" && sparkPool.length) {
+    try {
+      const priceMap = await loadRecentPricesForSymbols(
+        sparkPool.map((r) => r.symbol),
+        90
+      );
+      for (const row of sparkPool) {
+        const prices = priceMap.get(row.symbol) || [];
+        const closes = prices.slice(-30).map((p) => p.close);
+        row.sparkline = closes;
+        row.maxDrawdown = approxMaxDrawdown(closes.length ? closes : prices.map((p) => p.close));
+        if (prices.length >= 2) {
+          const last = prices[prices.length - 1].close;
+          const prev = prices[prices.length - 2].close;
+          row.return1d = computeReturnPct(prev, last);
+          const mStart = priceOnOrBefore(prices, addDays(prices[prices.length - 1].date, -30));
+          row.return1m = computeReturnPct(mStart?.close, last);
+        }
+      }
+    } catch {
+      /* optional */
+    }
+  }
+
+  const asc = sortAscForMetric(metricKey);
+  const ranked = [...enriched]
+    .filter((r) => metricValue(r, metricKey, periodKey) != null)
+    .sort((a, b) => {
+      const av = metricValue(a, metricKey, periodKey);
+      const bv = metricValue(b, metricKey, periodKey);
+      return asc ? av - bv : bv - av;
+    });
+
+  // Previous-period ranks for movement arrows (same metric where possible)
+  const prevMetric = metricKey === "return" ? "return" : metricKey;
+  const prevAsc = sortAscForMetric(prevMetric);
+  const prevRanked = [...enriched]
+    .filter((r) => {
+      if (prevMetric === "return") {
+        if (prevPeriodKey === "ytd") return r.returnYtd != null;
+        if (prevPeriodKey === "1y") return r.return1y != null;
+        if (prevPeriodKey === "3y") return r.return3y != null;
+        return r.return5y != null;
+      }
+      return metricValue(r, prevMetric, periodKey) != null;
+    })
+    .sort((a, b) => {
+      const pick = (row) => {
+        if (prevMetric === "return") {
+          if (prevPeriodKey === "ytd") return row.returnYtd;
+          if (prevPeriodKey === "1y") return row.return1y;
+          if (prevPeriodKey === "3y") return row.return3y;
+          return row.return5y;
+        }
+        return metricValue(row, prevMetric, periodKey);
+      };
+      const av = pick(a);
+      const bv = pick(b);
+      return prevAsc ? av - bv : bv - av;
+    });
+  const prevRankMap = new Map(prevRanked.map((r, i) => [r.symbol, i + 1]));
+
+  let withRank = ranked.map((r, i) => {
+    const rank = i + 1;
+    const previousRank = prevRankMap.get(r.symbol) ?? null;
+    const rankDelta = previousRank != null ? previousRank - rank : null; // positive = moved up
+    return {
+      ...r,
+      rank,
+      previousRank,
+      rankDelta,
+      score: metricValue(r, metricKey, periodKey),
+    };
+  });
+
+  // Optional secondary table column sort after ranking
+  if (sort && sort !== "rank" && sort !== metricKey) {
+    const dirAsc = String(sortDir).toLowerCase() === "asc";
+    withRank = [...withRank].sort((a, b) => {
+      const pick = (row) => {
+        if (sort === "symbol") return row.symbol;
+        if (sort === "name") return row.name;
+        if (sort === "price") return row.latestPrice;
+        if (sort === "issuer") return row.issuer;
+        if (sort === "category") return row.category;
+        if (sort === "aum") return row.aumBillions;
+        if (sort === "expense") return row.expenseRatio;
+        if (sort === "cagr") return row.cagr;
+        if (sort === "sharpe") return row.sharpeRatio;
+        if (sort === "yield") return row.dividendYieldTtm;
+        if (sort === "volatility") return row.volatility1y;
+        if (sort === "return") return row.return1y;
+        return row.rank;
+      };
+      const av = pick(a);
+      const bv = pick(b);
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (typeof av === "string") return dirAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+      return dirAsc ? av - bv : bv - av;
+    });
+  }
+
+  const total = withRank.length;
+  const page = withRank.slice(offsetVal, offsetVal + limitVal).map((r, i) => ({
+    ...r,
+    // Keep absolute rank from metric order even if secondary-sorted display
+    displayIndex: offsetVal + i + 1,
+  }));
+
+  return {
+    category: metricKey,
+    metric: metricKey,
+    period: periodKey,
+    basket: basketId,
+    data: page,
+    total,
     limit: limitVal,
     offset: offsetVal,
     freeTierLimited: isFree,

@@ -85,13 +85,20 @@ export async function getEtfScreener(req, res, next) {
 export async function getEtfRankings(req, res, next) {
   try {
     const plan = normalizePlanSlug(req.apiUser?.plan);
+    const q = req.query;
     const data = await etfMetricsService.rankEtfs(
       {
-        category: req.query.category,
-        period: req.query.period,
-        assetClass: req.query.assetClass,
-        limit: req.query.limit,
-        offset: req.query.offset,
+        category: q.category,
+        metric: q.metric || q.category,
+        period: q.period,
+        assetClass: q.assetClass,
+        basket: q.basket,
+        search: q.search || q.q,
+        sort: q.sort,
+        sortDir: q.sortDir,
+        limit: q.limit,
+        offset: q.offset,
+        includeSparkline: q.includeSparkline,
       },
       plan
     );
