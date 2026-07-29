@@ -461,7 +461,7 @@ export async function getEtfBySymbol(symbol) {
     beta,
     maxDrawdown: maxDrawdown(closes.slice(-252)),
     performance,
-    history: prices.slice(-800),
+    history: prices,
     sparkline: closes.slice(-30),
     dividends: (dividends || []).map((d) => ({
       exDate: d.ex_date,
