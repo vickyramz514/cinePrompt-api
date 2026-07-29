@@ -24,8 +24,16 @@ export const FREE_API_PATHS = new Set([
   "/etf/rankings",
 ]);
 
-/** Free plan: path patterns */
-export const FREE_API_PATH_PATTERNS = [];
+/**
+ * Free plan: path patterns (checked after exact FREE_API_PATHS).
+ * Single-segment ETF detail only — /etf/list, /etf/heatmap, etc. remain exact matches
+ * in FREE_API_PATHS (and would also match these patterns if listed there first).
+ * Multi-segment paths like /etf/heatmap/baskets do NOT match.
+ */
+export const FREE_API_PATH_PATTERNS = [
+  /^\/etf\/[A-Za-z0-9.-]+$/,
+  /^\/stocks\/[A-Za-z0-9.-]+\/history$/,
+];
 
 export function normalizePlanSlug(plan) {
   return String(plan || "free")
