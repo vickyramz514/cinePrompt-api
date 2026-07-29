@@ -81,14 +81,18 @@ async function loadPriceSeries(symbol, startDate, endDate) {
       date: { [Op.between]: [startDate, endDate] },
     },
     order: [["date", "ASC"]],
-    attributes: ["date", "close"],
+    attributes: ["date", "open", "high", "low", "close", "volume"],
     raw: true,
     limit: 12000,
   });
 
   return rows.map((r) => ({
     date: typeof r.date === "string" ? r.date : r.date.toISOString().slice(0, 10),
+    open: parseFloat(r.open),
+    high: parseFloat(r.high),
+    low: parseFloat(r.low),
     close: parseFloat(r.close),
+    volume: r.volume != null ? Number(r.volume) : 0,
   }));
 }
 
@@ -194,8 +198,8 @@ function riskMetricsFromDailyReturns(dailyReturns) {
   };
 }
 
-function metricsFromSimulation(sim, { adjustForInflation = false, inflationRate = DEFAULT_INFLATION, reinvestDividends = true } = {}) {
-  const { equityCurve, totalInvested, startPrice, endPrice, trades, strategyParams } = sim;
+function metricsFromSimulation(sim, { adjustForInflation = false, inflationRate = DEFAULT_INFLATION, reinvestDividends = true, prices = [] } = {}) {
+  const { equityCurve, totalInvested, startPrice, endPrice, trades, tradeEvents, dividendEvents, strategyParams } = sim;
   const startDate = equityCurve[0].date;
   const endDate = equityCurve[equityCurve.length - 1].date;
   const finalValue = equityCurve[equityCurve.length - 1].value;
@@ -205,15 +209,45 @@ function metricsFromSimulation(sim, { adjustForInflation = false, inflationRate 
   let peakValue = equityCurve[0].value;
   let maxDrawdown = 0;
   const dailyReturns = [];
+  const drawdownCurve = [];
+  let troughIndex = 0;
+  let maxDdPeak = peakValue;
+  let maxDdTroughValue = peakValue;
+
   for (let i = 0; i < equityCurve.length; i++) {
     const value = equityCurve[i].value;
     if (value > peakValue) peakValue = value;
     const dd = peakValue > 0 ? (peakValue - value) / peakValue : 0;
-    if (dd > maxDrawdown) maxDrawdown = dd;
+    if (dd > maxDrawdown) {
+      maxDrawdown = dd;
+      maxDdPeak = peakValue;
+      maxDdTroughValue = value;
+      troughIndex = i;
+    }
+    drawdownCurve.push({
+      date: equityCurve[i].date,
+      drawdown: round4pct(dd),
+      peak: round2(peakValue),
+      value: round2(value),
+    });
     if (i > 0) {
       const prev = equityCurve[i - 1].value;
       if (prev > 0) dailyReturns.push((value - prev) / prev);
     }
+  }
+
+  // Recovery days: from trough of max DD until equity recovers to that peak (or remaining days)
+  let recoveryDays = null;
+  if (maxDrawdown > 0) {
+    let recovered = false;
+    for (let i = troughIndex; i < equityCurve.length; i++) {
+      if (equityCurve[i].value >= maxDdPeak) {
+        recoveryDays = i - troughIndex;
+        recovered = true;
+        break;
+      }
+    }
+    if (!recovered) recoveryDays = equityCurve.length - 1 - troughIndex;
   }
 
   const totalReturn = (finalValue - invested) / invested;
@@ -230,6 +264,13 @@ function metricsFromSimulation(sim, { adjustForInflation = false, inflationRate 
     inflationAdjustedCagr = round4pct(Math.pow(inflationAdjustedFinal / invested, 1 / years) - 1);
   }
 
+  const last = equityCurve[equityCurve.length - 1];
+  const prev = equityCurve.length >= 2 ? equityCurve[equityCurve.length - 2] : null;
+  const todayChange =
+    prev && prev.value > 0 ? round2(last.value - prev.value) : null;
+  const todayChangePct =
+    prev && prev.value > 0 ? round4pct((last.value - prev.value) / prev.value) : null;
+
   return {
     startDate,
     endDate,
@@ -242,6 +283,7 @@ function metricsFromSimulation(sim, { adjustForInflation = false, inflationRate 
     annualReturn: round4pct(annualReturn),
     cagr: round4pct(annualReturn),
     maxDrawdown: round4pct(maxDrawdown),
+    maxDrawdownRecoveryDays: recoveryDays,
     volatility: risk.volatility,
     sharpe: risk.sharpe,
     sortino: risk.sortino,
@@ -249,6 +291,12 @@ function metricsFromSimulation(sim, { adjustForInflation = false, inflationRate 
     tradingDays: equityCurve.length,
     years: round2(years),
     trades,
+    tradeEvents: tradeEvents || [],
+    dividendEvents: dividendEvents || [],
+    prices,
+    drawdownCurve,
+    todayChange,
+    todayChangePct,
     reinvestDividends: Boolean(reinvestDividends),
     adjustForInflation: Boolean(adjustForInflation),
     inflationRate: adjustForInflation ? inflationRate : null,
@@ -359,6 +407,7 @@ export async function runBuyAndHoldBacktest(input) {
   const metrics = metricsFromSimulation(sim, {
     adjustForInflation,
     reinvestDividends,
+    prices: rangePrices,
   });
 
   const dividendYield = await estimateDividendYield(

@@ -1,7 +1,6 @@
 /**
  * Backtest strategy simulators.
- * Each returns { equityCurve, totalInvested, trades, strategyParams, startPrice, endPrice }
- * for the in-range price series (first point = first trading day in range).
+ * Each returns { equityCurve, totalInvested, trades, tradeEvents, dividendEvents, strategyParams, startPrice, endPrice }
  */
 
 import { ValidationError } from "../../utils/errors.js";
@@ -18,6 +17,10 @@ export const SUPPORTED_STRATEGIES = [
 
 function round2(n) {
   return Math.round(n * 100) / 100;
+}
+
+function round4(n) {
+  return Math.round(n * 10000) / 10000;
 }
 
 function sma(closes, period, i) {
@@ -67,15 +70,38 @@ function rsiSeries(closes, period = 14) {
 }
 
 function applyDividends(shares, cash, price, divPerShare, reinvest) {
-  if (!divPerShare || divPerShare <= 0 || shares <= 0) return { shares, cash };
+  if (!divPerShare || divPerShare <= 0 || shares <= 0) {
+    return { shares, cash, cashReceived: 0, reinvestedShares: 0, income: 0 };
+  }
   const income = shares * divPerShare;
   if (reinvest && price > 0) {
-    return { shares: shares + income / price, cash };
+    const reinvestedShares = income / price;
+    return {
+      shares: shares + reinvestedShares,
+      cash,
+      cashReceived: 0,
+      reinvestedShares: round4(reinvestedShares),
+      income: round2(income),
+    };
   }
-  return { shares, cash: cash + income };
+  return {
+    shares,
+    cash: cash + income,
+    cashReceived: round2(income),
+    reinvestedShares: 0,
+    income: round2(income),
+  };
 }
 
-function finalizeCurve(equityCurve, totalInvested, startPrice, endPrice, trades, strategyParams) {
+function finalizeCurve(
+  equityCurve,
+  totalInvested,
+  startPrice,
+  endPrice,
+  tradeEvents,
+  dividendEvents,
+  strategyParams
+) {
   if (equityCurve.length < 2) {
     throw new ValidationError("Not enough price history for this strategy / date range");
   }
@@ -84,9 +110,22 @@ function finalizeCurve(equityCurve, totalInvested, startPrice, endPrice, trades,
     totalInvested: round2(totalInvested),
     startPrice: round2(startPrice),
     endPrice: round2(endPrice),
-    trades,
+    trades: tradeEvents.length,
+    tradeEvents,
+    dividendEvents,
     strategyParams,
   };
+}
+
+function pushTrade(events, { date, side, price, shares, amount, portfolioValue }) {
+  events.push({
+    date,
+    side,
+    price: round2(price),
+    shares: round4(shares),
+    amount: round2(amount),
+    portfolioValue: round2(portfolioValue),
+  });
 }
 
 /** Buy & hold — deploy all capital on day 1. */
@@ -100,11 +139,35 @@ export function simulateBuyAndHold(prices, investment, { dividends = [], reinves
   let shares = investment / prices[0].close;
   let cash = 0;
   const equityCurve = [];
-  let trades = 1;
+  const tradeEvents = [];
+  const dividendEvents = [];
+
+  pushTrade(tradeEvents, {
+    date: prices[0].date,
+    side: "BUY",
+    price: prices[0].close,
+    shares,
+    amount: investment,
+    portfolioValue: investment,
+  });
 
   for (const p of prices) {
     const div = divByDate.get(p.date) || 0;
-    ({ shares, cash } = applyDividends(shares, cash, p.close, div, reinvestDividends));
+    if (div > 0) {
+      const before = shares;
+      const applied = applyDividends(shares, cash, p.close, div, reinvestDividends);
+      shares = applied.shares;
+      cash = applied.cash;
+      dividendEvents.push({
+        date: p.date,
+        amountPerShare: round4(div),
+        amount: applied.income,
+        reinvestedShares: applied.reinvestedShares,
+        cashReceived: applied.cashReceived,
+        sharesBefore: round4(before),
+        portfolioValue: round2(shares * p.close + cash),
+      });
+    }
     equityCurve.push({ date: p.date, value: round2(shares * p.close + cash) });
   }
 
@@ -113,7 +176,8 @@ export function simulateBuyAndHold(prices, investment, { dividends = [], reinves
     investment,
     prices[0].close,
     prices[prices.length - 1].close,
-    trades,
+    tradeEvents,
+    dividendEvents,
     { mode: "lump_sum" }
   );
 }
@@ -136,8 +200,9 @@ export function simulateDca(prices, investment, { dividends = [], reinvestDivide
   let cash = 0;
   let invested = 0;
   let lastMonth = null;
-  let trades = 0;
   const equityCurve = [];
+  const tradeEvents = [];
+  const dividendEvents = [];
 
   for (const p of prices) {
     const m = p.date.slice(0, 7);
@@ -145,15 +210,37 @@ export function simulateDca(prices, investment, { dividends = [], reinvestDivide
       cash += contribution;
       invested += contribution;
       if (p.close > 0) {
-        shares += cash / p.close;
+        const bought = cash / p.close;
+        shares += bought;
+        pushTrade(tradeEvents, {
+          date: p.date,
+          side: "BUY",
+          price: p.close,
+          shares: bought,
+          amount: cash,
+          portfolioValue: shares * p.close,
+        });
         cash = 0;
-        trades += 1;
       }
       lastMonth = m;
     }
 
     const div = divByDate.get(p.date) || 0;
-    ({ shares, cash } = applyDividends(shares, cash, p.close, div, reinvestDividends));
+    if (div > 0 && shares > 0) {
+      const before = shares;
+      const applied = applyDividends(shares, cash, p.close, div, reinvestDividends);
+      shares = applied.shares;
+      cash = applied.cash;
+      dividendEvents.push({
+        date: p.date,
+        amountPerShare: round4(div),
+        amount: applied.income,
+        reinvestedShares: applied.reinvestedShares,
+        cashReceived: applied.cashReceived,
+        sharesBefore: round4(before),
+        portfolioValue: round2(shares * p.close + cash),
+      });
+    }
     equityCurve.push({ date: p.date, value: round2(shares * p.close + cash) });
   }
 
@@ -162,7 +249,8 @@ export function simulateDca(prices, investment, { dividends = [], reinvestDivide
     invested,
     prices[0].close,
     prices[prices.length - 1].close,
-    trades,
+    tradeEvents,
+    dividendEvents,
     { contributionPerMonth: round2(contribution), months: monthCount }
   );
 }
@@ -170,8 +258,6 @@ export function simulateDca(prices, investment, { dividends = [], reinvestDivide
 /**
  * Long/flat signal strategy: when signal goes true, buy with all cash;
  * when false, sell all shares to cash.
- * `signalAt(i)` uses full series index (including warmup).
- * `rangeStart` is first index of the reported range.
  */
 function simulateSignalStrategy(
   allPrices,
@@ -189,9 +275,10 @@ function simulateSignalStrategy(
   let shares = 0;
   let cash = investment;
   let invested = investment;
-  let trades = 0;
   let position = false;
   const equityCurve = [];
+  const tradeEvents = [];
+  const dividendEvents = [];
 
   for (let i = rangeStart; i < allPrices.length; i++) {
     const p = allPrices[i];
@@ -199,19 +286,48 @@ function simulateSignalStrategy(
 
     if (wantLong && !position && cash > 0 && p.close > 0) {
       shares = cash / p.close;
+      const amount = cash;
       cash = 0;
       position = true;
-      trades += 1;
+      pushTrade(tradeEvents, {
+        date: p.date,
+        side: "BUY",
+        price: p.close,
+        shares,
+        amount,
+        portfolioValue: shares * p.close + cash,
+      });
     } else if (!wantLong && position && p.close > 0) {
-      cash = shares * p.close;
+      const amount = shares * p.close;
+      const soldShares = shares;
+      cash = amount;
       shares = 0;
       position = false;
-      trades += 1;
+      pushTrade(tradeEvents, {
+        date: p.date,
+        side: "SELL",
+        price: p.close,
+        shares: soldShares,
+        amount,
+        portfolioValue: cash,
+      });
     }
 
     const div = divByDate.get(p.date) || 0;
-    if (position) {
-      ({ shares, cash } = applyDividends(shares, cash, p.close, div, reinvestDividends));
+    if (position && div > 0) {
+      const before = shares;
+      const applied = applyDividends(shares, cash, p.close, div, reinvestDividends);
+      shares = applied.shares;
+      cash = applied.cash;
+      dividendEvents.push({
+        date: p.date,
+        amountPerShare: round4(div),
+        amount: applied.income,
+        reinvestedShares: applied.reinvestedShares,
+        cashReceived: applied.cashReceived,
+        sharesBefore: round4(before),
+        portfolioValue: round2(shares * p.close + cash),
+      });
     }
 
     equityCurve.push({ date: p.date, value: round2(shares * p.close + cash) });
@@ -223,7 +339,8 @@ function simulateSignalStrategy(
     invested,
     rangePrices[0].close,
     rangePrices[rangePrices.length - 1].close,
-    trades,
+    tradeEvents,
+    dividendEvents,
     strategyParams
   );
 }
@@ -277,7 +394,6 @@ export function simulateRsi(allPrices, rangeStart, investment, opts = {}) {
   const closes = allPrices.map((p) => p.close);
   const rsi = rsiSeries(closes, period);
 
-  // Sticky: enter when RSI rises through buyBelow; exit when falls through sellAbove
   let long = false;
   const signalAt = (i) => {
     const cur = rsi[i];
@@ -305,7 +421,6 @@ export function simulateMacd(allPrices, rangeStart, investment, opts = {}) {
     emaFast[i] != null && emaSlow[i] != null ? emaFast[i] - emaSlow[i] : null
   );
 
-  // Signal EMA on MACD line (skip nulls by building compact then map back)
   const compact = [];
   const compactIdx = [];
   for (let i = 0; i < macdLine.length; i++) {
@@ -335,13 +450,13 @@ export function simulateMacd(allPrices, rangeStart, investment, opts = {}) {
 export function simulateCustom(allPrices, rangeStart, investment, opts = {}) {
   return simulateSmaCrossover(allPrices, rangeStart, investment, {
     ...opts,
-    fastPeriod: Number(opts.fastPeriod ?? 10),
-    slowPeriod: Number(opts.slowPeriod ?? 30),
+    fastPeriod: opts.fastPeriod ?? 10,
+    slowPeriod: opts.slowPeriod ?? 30,
   });
 }
 
-export function addCalendarDays(isoDate, days) {
-  const d = new Date(`${isoDate}T00:00:00Z`);
+export function addCalendarDays(dateStr, days) {
+  const d = new Date(`${dateStr}T00:00:00.000Z`);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
