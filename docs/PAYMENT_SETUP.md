@@ -19,7 +19,7 @@ Add to `.env`:
 RAZORPAY_KEY_ID=rzp_test_xxxxx
 RAZORPAY_KEY_SECRET=your_key_secret
 RAZORPAY_WEBHOOK_SECRET=your_webhook_secret
-PUBLIC_API_URL=https://datacaptain.up.railway.app
+PUBLIC_API_URL=https://api.datacaptain.in
 ```
 
 ## Razorpay Dashboard Setup
@@ -28,7 +28,7 @@ PUBLIC_API_URL=https://datacaptain.up.railway.app
 2. Get API keys: Dashboard → Settings → API Keys
 3. Enable Subscriptions: Dashboard → Settings → Configuration
 4. Create webhook: Dashboard → Settings → Webhooks
-   - URL: `https://datacaptain.up.railway.app/api/payment/webhook`
+   - URL: `https://api.datacaptain.in/v1/payment/webhook`
    - Events: `subscription.charged`, `subscription.activated`, `subscription.cancelled`, `subscription.completed`
    - Copy the webhook secret to `RAZORPAY_WEBHOOK_SECRET` on Railway (must match Dashboard)
 
@@ -80,7 +80,7 @@ RAZORPAY_PLAN_CREATOR=plan_xxxxxxxxxxxxx npm run razorpay:link-plans
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | POST | /api/payment/create-subscription | Yes | Same as subscriptions/create |
-| POST | /api/payment/webhook | No | Razorpay webhook (signature verified) |
+| POST | /v1/payment/webhook | No | Razorpay webhook (signature verified) |
 
 ### Wallet
 

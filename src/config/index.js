@@ -23,7 +23,7 @@ const config = {
   isProduction: process.env.NODE_ENV === 'production',
 
   // Public API origin (no trailing slash) — used for Razorpay webhook docs/logging
-  publicApiUrl: (process.env.PUBLIC_API_URL || 'https://datacaptain.up.railway.app').replace(/\/$/, ''),
+  publicApiUrl: (process.env.PUBLIC_API_URL || 'https://api.datacaptain.in').replace(/\/$/, ''),
 
   // Redis
   redis: {

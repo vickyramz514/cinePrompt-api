@@ -11,7 +11,7 @@
 
 ```bash
 # Login (replace with your credentials)
-curl -X POST http://localhost:4000/api/auth/login \
+curl -X POST http://localhost:4000/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"your@email.com","password":"yourpassword"}'
 
@@ -26,7 +26,7 @@ curl -X POST http://localhost:4000/api/auth/login \
 TOKEN="YOUR_JWT"
 
 # Success - should return 202 and queue job
-curl -X POST http://localhost:4000/api/video/generate \
+curl -X POST http://localhost:4000/v1/video/generate \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"prompt":"A cinematic sunset over mountains","duration":5}'
@@ -62,23 +62,23 @@ TOKEN="YOUR_ADMIN_JWT"
 
 # Overview
 curl -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:4000/api/analytics/overview"
+  "http://localhost:4000/v1/analytics/overview"
 
 # Usage trends (last 30 days)
 curl -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:4000/api/analytics/usage-trends?days=30"
+  "http://localhost:4000/v1/analytics/usage-trends?days=30"
 
 # API cost
 curl -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:4000/api/analytics/api-cost?days=30"
+  "http://localhost:4000/v1/analytics/api-cost?days=30"
 
 # Top users
 curl -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:4000/api/analytics/top-users?limit=10"
+  "http://localhost:4000/v1/analytics/top-users?limit=10"
 
 # Profit metrics
 curl -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:4000/api/analytics/profit-metrics?days=30"
+  "http://localhost:4000/v1/analytics/profit-metrics?days=30"
 ```
 
 Non-admin users get **403 Forbidden**.
@@ -88,7 +88,7 @@ Non-admin users get **403 Forbidden**.
 ```bash
 # Save as test-flows.sh
 
-API="http://localhost:4000/api"
+API="http://localhost:4000/v1"
 TOKEN="$1"
 
 if [ -z "$TOKEN" ]; then
@@ -109,7 +109,7 @@ curl -s -H "Authorization: Bearer $TOKEN" "$API/analytics/overview" | jq .
 ## 6. Frontend Integration
 
 No changes needed for basic flow. The frontend already:
-- Calls `POST /api/video/generate` with auth
+- Calls `POST /v1/video/generate` with auth
 - Handles 402 (insufficient credits)
 - Handles 429 (rate limit) - you may want to show a user-friendly message
 

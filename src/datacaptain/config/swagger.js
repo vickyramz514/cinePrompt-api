@@ -32,7 +32,7 @@ const spec = {
   },
   security: [{ ApiKeyAuth: [] }],
   paths: {
-    "/api/stocks/{symbol}/price": {
+    "/v1/stocks/{symbol}/price": {
       get: {
         summary: "Get stock price",
         tags: ["Stock"],
@@ -61,7 +61,7 @@ const spec = {
         },
       },
     },
-    "/api/stocks/{symbol}/history": {
+    "/v1/stocks/{symbol}/history": {
       get: {
         summary: "Get historical OHLCV data",
         description: "Daily (or interval) OHLCV bars. Available on Free plan for ETF research charts.",
@@ -76,7 +76,7 @@ const spec = {
         responses: { 200: { description: "Array of OHLCV bars { date, open, high, low, close, volume }" } },
       },
     },
-    "/api/stocks/{symbol}/candles": {
+    "/v1/stocks/{symbol}/candles": {
       get: {
         summary: "Get OHLC candle data",
         tags: ["Stock"],
@@ -88,7 +88,7 @@ const spec = {
         responses: { 200: { description: "OHLC candles" } },
       },
     },
-    "/api/stocks/{symbol}/profile": {
+    "/v1/stocks/{symbol}/profile": {
       get: {
         summary: "Get company profile",
         tags: ["Stock"],
@@ -99,7 +99,7 @@ const spec = {
         responses: { 200: { description: "Company info" } },
       },
     },
-    "/api/stocks/{symbol}/dividends": {
+    "/v1/stocks/{symbol}/dividends": {
       get: {
         summary: "Get dividend history",
         tags: ["Stock"],
@@ -110,7 +110,7 @@ const spec = {
         responses: { 200: { description: "Dividend list" } },
       },
     },
-    "/api/stocks/{symbol}/earnings": {
+    "/v1/stocks/{symbol}/earnings": {
       get: {
         summary: "Get earnings data",
         tags: ["Stock"],
@@ -121,7 +121,7 @@ const spec = {
         responses: { 200: { description: "Earnings list" } },
       },
     },
-    "/api/market/top-gainers": {
+    "/v1/market/top-gainers": {
       get: {
         summary: "Top gainers",
         tags: ["Market"],
@@ -129,7 +129,7 @@ const spec = {
         responses: { 200: { description: "Top gaining stocks" } },
       },
     },
-    "/api/market/top-losers": {
+    "/v1/market/top-losers": {
       get: {
         summary: "Top losers",
         tags: ["Market"],
@@ -137,7 +137,7 @@ const spec = {
         responses: { 200: { description: "Top losing stocks" } },
       },
     },
-    "/api/market/most-active": {
+    "/v1/market/most-active": {
       get: {
         summary: "Most active",
         tags: ["Market"],
@@ -145,7 +145,7 @@ const spec = {
         responses: { 200: { description: "Most traded stocks" } },
       },
     },
-    "/api/search": {
+    "/v1/search": {
       get: {
         summary: "Search stocks",
         tags: ["Search"],
@@ -156,7 +156,7 @@ const spec = {
         responses: { 200: { description: "Matching stocks" } },
       },
     },
-    "/api/screener": {
+    "/v1/screener": {
       get: {
         summary: "Stock screener",
         tags: ["Screener"],
@@ -173,7 +173,7 @@ const spec = {
         responses: { 200: { description: "Filtered stocks with latest price" } },
       },
     },
-    "/api/indicators/{symbol}": {
+    "/v1/indicators/{symbol}": {
       get: {
         summary: "Technical indicators (RSI, SMA, EMA, MACD, Bollinger Bands)",
         tags: ["Indicators"],
@@ -188,7 +188,7 @@ const spec = {
         responses: { 200: { description: "Indicator values" } },
       },
     },
-    "/api/ai/stock-score/{symbol}": {
+    "/v1/ai/stock-score/{symbol}": {
       get: {
         summary: "AI stock score (0-100) from trend, momentum, volume, volatility",
         tags: ["AI"],
@@ -199,7 +199,7 @@ const spec = {
         responses: { 200: { description: "Score and components (cached 60s)" } },
       },
     },
-    "/api/developer/usage": {
+    "/v1/developer/usage": {
       get: {
         summary: "Developer usage stats (plan, requests today, remaining)",
         tags: ["Developer"],
@@ -224,7 +224,7 @@ const spec = {
         },
       },
     },
-    "/api/market/status": {
+    "/v1/market/status": {
       get: {
         summary: "US market status (OPEN/CLOSED, NYSE holidays & early closes)",
         description:
@@ -259,7 +259,7 @@ const spec = {
         },
       },
     },
-    "/api/stocks/prices": {
+    "/v1/stocks/prices": {
       get: {
         summary: "Batch stock prices (max 50 symbols)",
         tags: ["Stock"],
@@ -274,7 +274,7 @@ const spec = {
         },
       },
     },
-    "/api/etf/list": {
+    "/v1/etf/list": {
       get: {
         summary: "List / filter ETFs (paginated research universe)",
         description:
@@ -324,7 +324,7 @@ const spec = {
         },
       },
     },
-    "/api/etf/heatmap": {
+    "/v1/etf/heatmap": {
       get: {
         summary: "ETF performance heatmap",
         description: "Return % cells for a preset basket or custom symbol list. Free plan.",
@@ -360,7 +360,7 @@ const spec = {
         },
       },
     },
-    "/api/etf/heatmap/baskets": {
+    "/v1/etf/heatmap/baskets": {
       get: {
         summary: "List heatmap basket presets",
         tags: ["ETF"],
@@ -372,7 +372,7 @@ const spec = {
         },
       },
     },
-    "/api/etf/screener": {
+    "/v1/etf/screener": {
       get: {
         summary: "ETF screener",
         description: "Filter and sort ETFs by return, yield, risk, expense, AUM, and flags. Free plan: top 10.",
@@ -423,7 +423,7 @@ const spec = {
         },
       },
     },
-    "/api/etf/rankings": {
+    "/v1/etf/rankings": {
       get: {
         summary: "ETF rankings / leaderboards",
         description:
@@ -467,7 +467,7 @@ const spec = {
         },
       },
     },
-    "/api/etf/{symbol}": {
+    "/v1/etf/{symbol}": {
       get: {
         summary: "ETF research profile",
         description:
@@ -486,7 +486,7 @@ const spec = {
         },
       },
     },
-    "/api/backtest/buy-and-hold": {
+    "/v1/backtest/buy-and-hold": {
       get: {
         summary: "Run ETF strategy backtest (GET)",
         description: "Paid plan. Same body params as query string.",
@@ -571,7 +571,7 @@ const spec = {
         },
       },
     },
-    "/api/backtest/compare": {
+    "/v1/backtest/compare": {
       get: {
         summary: "Compare ETF backtests (GET)",
         tags: ["Backtesting"],
@@ -638,7 +638,7 @@ const spec = {
         },
       },
     },
-    "/api/portfolio/rebalance": {
+    "/v1/portfolio/rebalance": {
       get: {
         summary: "Portfolio rebalance suggestions (GET)",
         description: "Paid plan. Pass holdings/target as JSON strings in query if using GET.",
@@ -719,7 +719,7 @@ const spec = {
         },
       },
     },
-    "/api/options/{symbol}": {
+    "/v1/options/{symbol}": {
       get: {
         summary: "Options chain (calls and puts)",
         tags: ["Options"],
@@ -773,7 +773,7 @@ const spec = {
         },
       },
     },
-    "/api/insiders/{symbol}": {
+    "/v1/insiders/{symbol}": {
       get: {
         summary: "Insider trading activity",
         tags: ["Insiders"],
@@ -807,7 +807,7 @@ const spec = {
         },
       },
     },
-    "/api/sentiment/{symbol}": {
+    "/v1/sentiment/{symbol}": {
       get: {
         summary: "Stock sentiment score (-1 to +1)",
         tags: ["Sentiment"],
@@ -835,7 +835,7 @@ const spec = {
         },
       },
     },
-    "/api/economy/indicators": {
+    "/v1/economy/indicators": {
       get: {
         summary: "Major economic indicators",
         tags: ["Economy"],
@@ -860,7 +860,7 @@ const spec = {
         },
       },
     },
-    "/api/darkpool/{symbol}": {
+    "/v1/darkpool/{symbol}": {
       get: {
         summary: "Dark pool trading activity",
         tags: ["Dark Pool"],

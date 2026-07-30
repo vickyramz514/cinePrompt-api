@@ -1,5 +1,5 @@
 /**
- * Free vs paid API access (DataCaptain routes, path relative to /api mount).
+ * Free vs paid API access (DataCaptain routes, path relative to /v1 mount).
  */
 
 export const FREE_PLAN_SLUGS = new Set(["free"]);

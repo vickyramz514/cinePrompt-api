@@ -311,7 +311,7 @@ npm run etf:compute-metrics  # historical_prices → etf_metrics
 Check live status:
 
 ```bash
-curl https://datacaptain.up.railway.app/api/status
+curl https://api.datacaptain.in/v1/status
 ```
 
 Or SQL:

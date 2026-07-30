@@ -69,15 +69,16 @@ app.use(
 app.use(applyRateLimit);
 
 // Webhook: raw body required for Razorpay signature (must run before express.json)
-app.use(
-  '/api/payment/webhook',
+const webhookMiddleware = [
   express.raw({ type: 'application/json' }),
   (req, res, next) => {
     req.rawBody = req.body && Buffer.isBuffer(req.body) ? req.body.toString('utf8') : '';
     next();
   },
-  paymentController.handleWebhook
-);
+  paymentController.handleWebhook,
+];
+app.use('/v1/payment/webhook', ...webhookMiddleware);
+app.use('/api/payment/webhook', ...webhookMiddleware); // legacy alias
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
@@ -91,7 +92,8 @@ import swaggerUi from 'swagger-ui-express';
 import datacaptainSwagger from './datacaptain/config/swagger.js';
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(datacaptainSwagger, { swaggerOptions: { persistAuthorization: true } }));
 
-// Routes
+// Routes — /v1 is canonical; /api kept as a temporary compatibility alias
+app.use('/v1', routes);
 app.use('/api', routes);
 
 // 404
