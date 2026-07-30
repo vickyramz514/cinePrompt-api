@@ -56,8 +56,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// Security
-app.use(helmet());
+// Security (allow Google OAuth popups to postMessage back to the opener)
+app.use(
+  helmet({
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+  })
+);
 app.use(
   cors({
     origin: config.cors.origin,
