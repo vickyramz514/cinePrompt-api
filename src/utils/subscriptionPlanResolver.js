@@ -14,7 +14,15 @@ const scriptsDir = resolve(__dirname, '../../scripts');
 
 /** Prisma UserPlan enum from subscription slug */
 export function mapPlanSlugToUserPlan(slug) {
-  const m = { free: 'FREE', starter: 'STARTER', creator: 'CREATOR', pro: 'PRO', ultra: 'ULTRA' };
+  const m = {
+    free: 'FREE',
+    starter: 'STARTER',
+    creator: 'CREATOR',
+    pro: 'PRO',
+    ultra: 'ULTRA',
+    // ₹1 admin checkout plan — treat as Starter entitlements for testing
+    'admin-test': 'STARTER',
+  };
   return m[String(slug || '').toLowerCase()] || 'FREE';
 }
 

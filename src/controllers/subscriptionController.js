@@ -9,6 +9,16 @@ import { ValidationError, NotFoundError, AppError, ForbiddenError } from '../uti
 import { resolvePlanId } from '../utils/razorpayPlanResolver.js';
 import { confirmSubscriptionForUser } from '../services/subscriptionActivationService.js';
 
+function isAdminUser(user) {
+  return user && ['ADMIN', 'SUPER_ADMIN'].includes(user.role);
+}
+
+function assertPlanSubscribeAccess(plan, user) {
+  if (plan.adminOnly && !isAdminUser(user)) {
+    throw new ForbiddenError('This plan is only available to admin users');
+  }
+}
+
 async function assertRazorpayPlanPricing(plan, razorpayPlanId, mode) {
   let remote;
   try {
@@ -43,8 +53,12 @@ async function assertRazorpayPlanPricing(plan, razorpayPlanId, mode) {
 
 export const listPlans = async (req, res, next) => {
   try {
+    const includeAdminOnly = isAdminUser(req.user);
     const plans = await prisma.subscriptionPlan.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        ...(includeAdminOnly ? {} : { adminOnly: false }),
+      },
       orderBy: { sortOrder: 'asc' },
       select: {
         id: true,
@@ -57,6 +71,7 @@ export const listPlans = async (req, res, next) => {
         creditsPerMonth: true,
         billingCycle: true,
         features: true,
+        adminOnly: true,
       },
     });
 
@@ -121,6 +136,7 @@ export const create = async (req, res, next) => {
         'Plan not found.'
       );
     }
+    assertPlanSubscribeAccess(plan, req.user);
     if (plan.priceCents <= 0) {
       throw new ValidationError('Free plan cannot be subscribed');
     }

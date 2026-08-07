@@ -65,7 +65,14 @@ export const optionalAuth = async (req, res, next) => {
     const decoded = jwt.verify(token, config.jwt.accessSecret);
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
-      select: { id: true, name: true, email: true, credits: true, plan: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        credits: true,
+        plan: true,
+        role: true,
+      },
     });
 
     if (user) req.user = user;

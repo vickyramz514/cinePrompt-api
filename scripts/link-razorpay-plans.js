@@ -19,6 +19,7 @@ const planVars = [
   { slug: 'starter', envKey: 'RAZORPAY_PLAN_STARTER' },
   { slug: 'pro', envKey: 'RAZORPAY_PLAN_PRO' },
   { slug: 'ultra', envKey: 'RAZORPAY_PLAN_ULTRA' },
+  { slug: 'admin-test', envKey: 'RAZORPAY_PLAN_ADMIN_TEST' },
   // legacy fallback mapping
   { slug: 'creator', envKey: 'RAZORPAY_PLAN_CREATOR' },
 ];

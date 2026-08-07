@@ -3,10 +3,11 @@
  * npx node prisma/seed-subscription-plans.js
  *
  * Plans:
- * - Free: $0, 50 requests/day
+ * - Free: ₹0, 50 requests/day
  * - Starter: ₹1,500/month, 1,000 requests/day
  * - Pro: ₹2,500/month, 10,000 requests/day
  * - Ultra: ₹5,000/month, 100,000 requests/day
+ * - Admin Test: ₹1/month (Razorpay plan_TMjQVr5OqTfKX8) — adminOnly
  *
  * Razorpay plan IDs: Create plans in Razorpay Dashboard or via API, then set here.
  */
@@ -28,6 +29,7 @@ const plans = [
     razorpayPlanId: null,
     features: ['50 requests/day', 'ETF list & batch prices', 'Market status', 'Basic support'],
     isActive: true,
+    adminOnly: false,
     sortOrder: 0,
   },
   {
@@ -42,6 +44,7 @@ const plans = [
     razorpayPlanId: null, // Set after creating plan in Razorpay: plan_xxx
     features: ['1,000 requests/day', 'Historical ETF data', 'Backtesting', 'Email support'],
     isActive: true,
+    adminOnly: false,
     sortOrder: 1,
   },
   {
@@ -56,6 +59,7 @@ const plans = [
     razorpayPlanId: null,
     features: ['10,000 requests/day', 'Historical ETF data', 'Higher limits', 'Priority support'],
     isActive: true,
+    adminOnly: false,
     sortOrder: 2,
   },
   {
@@ -70,6 +74,7 @@ const plans = [
     razorpayPlanId: null,
     features: [],
     isActive: false,
+    adminOnly: false,
     sortOrder: 98,
   },
   {
@@ -84,7 +89,28 @@ const plans = [
     razorpayPlanId: null,
     features: ['100,000 requests/day', 'Historical ETF data', 'High-volume production', 'Priority support'],
     isActive: true,
+    adminOnly: false,
     sortOrder: 3,
+  },
+  {
+    name: 'Admin Test',
+    slug: 'admin-test',
+    description: 'Internal ₹1 Razorpay test plan — visible to admins only',
+    priceCents: 100, // ₹1 (matches Razorpay plan_TMjQVr5OqTfKX8)
+    currency: 'INR',
+    credits: 1000,
+    creditsPerMonth: 1000,
+    billingCycle: 'monthly',
+    razorpayPlanId: 'plan_TMjQVr5OqTfKX8',
+    features: [
+      'Admin-only checkout test',
+      '₹1 / month (Razorpay live test plan)',
+      'Starter-level API entitlements',
+      '1,000 requests/day',
+    ],
+    isActive: true,
+    adminOnly: true,
+    sortOrder: 90,
   },
   {
     name: 'Enterprise',
@@ -98,6 +124,7 @@ const plans = [
     razorpayPlanId: null,
     features: ['Custom volume', 'Dedicated support', 'SLA'],
     isActive: false,
+    adminOnly: false,
     sortOrder: 100,
   },
 ];

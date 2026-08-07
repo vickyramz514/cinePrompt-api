@@ -251,6 +251,7 @@ model SubscriptionPlan {
   razorpayPlanId   String?  // Razorpay plan_xxx ID for subscription plans
   features         Json?    // ["1080p", "priority"]
   isActive         Boolean  @default(true)
+  adminOnly        Boolean  @default(false) // Visible/subscribable only for ADMIN / SUPER_ADMIN
   sortOrder        Int      @default(0)
   metadata         Json?
   createdAt        DateTime @default(now())
@@ -260,6 +261,7 @@ model SubscriptionPlan {
 
   @@index([slug])
   @@index([isActive])
+  @@index([adminOnly])
   @@index([razorpayPlanId])
 }
 

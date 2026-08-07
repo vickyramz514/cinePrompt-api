@@ -8,7 +8,7 @@ import config from '../config/index.js';
 import { createSubscription, fetchPlan } from '../services/razorpayService.js';
 import { addCreditsSubscription } from '../services/creditService.js';
 import { logger } from '../utils/logger.js';
-import { ValidationError, NotFoundError, AppError } from '../utils/errors.js';
+import { ValidationError, NotFoundError, AppError, ForbiddenError } from '../utils/errors.js';
 import { syncApiUserPlanByEmail } from '../utils/syncApiUserPlan.js';
 import { resolvePlanId } from '../utils/razorpayPlanResolver.js';
 import {
@@ -16,6 +16,16 @@ import {
   mapPlanSlugToUserPlan,
 } from '../utils/subscriptionPlanResolver.js';
 import { activateSubscriptionFromRazorpayEntity } from '../services/subscriptionActivationService.js';
+
+function isAdminUser(user) {
+  return user && ['ADMIN', 'SUPER_ADMIN'].includes(user.role);
+}
+
+function assertPlanSubscribeAccess(plan, user) {
+  if (plan.adminOnly && !isAdminUser(user)) {
+    throw new ForbiddenError('This plan is only available to admin users');
+  }
+}
 
 async function assertRazorpayPlanPricing(plan, razorpayPlanId, mode) {
   let remote;
@@ -68,6 +78,7 @@ export const createSubscriptionCheckout = async (req, res, next) => {
         'Plan not found.'
       );
     }
+    assertPlanSubscribeAccess(plan, req.user);
     if (plan.priceCents <= 0) {
       throw new ValidationError('Free plan cannot be subscribed');
     }
