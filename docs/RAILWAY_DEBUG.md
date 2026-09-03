@@ -77,8 +77,24 @@ Redeploy. Responses will include `details` with the raw error message. Remove wh
 1. Railway logs should show:
    - `Startup: API key encryption OK`
    - `Startup: ApiKeySecret table OK`
-2. Call `GET https://api.datacaptain.in/v1/health` → `{ "status": "ok" }`
+   - `Rate limit store (Redis) ready`
+2. Call `GET https://api.datacaptain.in/health` (or `/v1/health`) → `{ "status": "ok" }`
 3. Retry `POST /api/api-keys/regenerate` with a valid JWT.
+
+## Load balancer (Railway replicas)
+
+Railway load-balances HTTP (and WebSocket upgrades) across replicas round-robin. Config lives in `railway.toml`:
+
+- `numReplicas = 2` — horizontal scale (set to `1` to disable)
+- `healthcheckPath = "/health"` — new deploys only receive traffic after `200`
+
+App requirements already wired in code:
+
+- `trust proxy` (production) so `req.ip` / rate limits use the real client behind the edge
+- Redis-backed rate limits so counters are shared across replicas (`REDIS_URL` must be set)
+- Stateless WebSocket: each connection stays on one replica; no sticky sessions required for `/ws`
+
+Dashboard alternative: service → **Settings** → **Replicas** / **Healthcheck Path**.
 
 ## Razorpay webhook (production)
 

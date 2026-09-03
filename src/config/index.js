@@ -16,11 +16,23 @@ function inferRazorpayKeyMode(keyId) {
   return 'unknown';
 }
 
+/** Hop count for Express `trust proxy` (Railway edge / load balancer). */
+function resolveTrustProxy() {
+  const raw = process.env.TRUST_PROXY;
+  if (raw === 'false' || raw === '0') return false;
+  if (raw === 'true') return 1;
+  if (raw != null && raw !== '' && !Number.isNaN(Number(raw))) return Number(raw);
+  // Production defaults to 1 hop (Railway / reverse proxy in front of the app)
+  return process.env.NODE_ENV === 'production' ? 1 : false;
+}
+
 const config = {
   // Server
   port: parseInt(process.env.PORT || '4000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   isProduction: process.env.NODE_ENV === 'production',
+  // Required behind Railway LB so req.ip / rate limits use the real client IP
+  trustProxy: resolveTrustProxy(),
 
   // Public API origin (no trailing slash) — used for Razorpay webhook docs/logging
   publicApiUrl: (process.env.PUBLIC_API_URL || 'https://api.datacaptain.in').replace(/\/$/, ''),

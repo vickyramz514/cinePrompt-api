@@ -8,7 +8,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import config from './config/index.js';
-import { applyRateLimit } from './middlewares/rateLimiters.js';
+import { applyRateLimit, initRateLimitStores } from './middlewares/rateLimiters.js';
 import routes from './routes/index.js';
 import * as paymentController from './controllers/paymentController.js';
 import { errorHandler } from './middlewares/errorHandler.js';
@@ -22,6 +22,16 @@ import { isOriginAllowed, parseCorsOriginList } from './utils/corsOrigins.js';
 
 const app = express();
 const server = http.createServer(app);
+
+// Trust Railway edge / load balancer so req.ip and rate limits see the real client
+if (config.trustProxy !== false) {
+  app.set('trust proxy', config.trustProxy);
+}
+
+// Load balancer / Railway healthcheck (must be 200 before traffic is switched)
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 // CORS preflight: handle OPTIONS first so all origins get proper headers (incl. Vercel preview URLs)
 app.options('*', (req, res) => {
@@ -116,9 +126,19 @@ async function start() {
   } catch (err) {
     logger.warn('DataCaptain DB not ready (run datacaptain:db:migrate)', err?.message);
   }
+  try {
+    await initRateLimitStores();
+    logger.info('Rate limit store (Redis) ready — shared across LB replicas');
+  } catch (err) {
+    logger.warn('Rate limit Redis not ready', { message: err?.message });
+  }
   attachWebSocket(server);
   server.listen(config.port, () => {
-    logger.info('Server started', { port: config.port, env: config.nodeEnv });
+    logger.info('Server started', {
+      port: config.port,
+      env: config.nodeEnv,
+      trustProxy: config.trustProxy,
+    });
     logRazorpayStartupHints();
     logger.info('DataCaptain WebSocket: ws://localhost:' + config.port + '/ws');
     runStartupChecks().catch((err) => logger.warn('Startup checks failed', { message: err.message }));

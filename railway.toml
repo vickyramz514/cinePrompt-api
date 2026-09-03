@@ -1,0 +1,14 @@
+# Railway load balancing: replicas share traffic round-robin.
+# App must stay stateless (Redis/DB for shared state) — already required for rate limits.
+
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "npm run start:prod"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+# Horizontal scale — Railway LB routes HTTP/WS across replicas
+numReplicas = 2
