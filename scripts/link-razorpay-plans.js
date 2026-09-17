@@ -17,6 +17,7 @@ const prisma = new PrismaClient();
 
 const planVars = [
   { slug: 'starter', envKey: 'RAZORPAY_PLAN_STARTER' },
+  { slug: 'starter-annual', envKey: 'RAZORPAY_PLAN_STARTER_ANNUAL' },
   { slug: 'pro', envKey: 'RAZORPAY_PLAN_PRO' },
   { slug: 'ultra', envKey: 'RAZORPAY_PLAN_ULTRA' },
   { slug: 'admin-test', envKey: 'RAZORPAY_PLAN_ADMIN_TEST' },

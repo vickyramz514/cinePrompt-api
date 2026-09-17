@@ -62,7 +62,7 @@ const plans = [
     credits: 1000,
     creditsPerMonth: 1000,
     billingCycle: 'yearly',
-    razorpayPlanId: null, // Create yearly plan in Razorpay, then link
+    razorpayPlanId: 'plan_Td0xEpRepdFo7Z',
     features: [
       'Everything in Starter',
       'Billed annually',
