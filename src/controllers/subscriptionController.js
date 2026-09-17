@@ -81,13 +81,17 @@ export const listPlans = async (req, res, next) => {
     res.json({
       success: true,
       data: {
-        plans: plans.map(({ razorpayPlanId, ...plan }) => ({
-          ...plan,
-          checkoutAvailable:
-            plan.priceCents === 0 ||
-            plan.priceCents < 0 ||
-            Boolean(razorpayPlanId),
-        })),
+        plans: plans.map(({ razorpayPlanId, ...plan }) => {
+          const { planId: mappedId } = resolvePlanId(plan.slug, razorpayPlanId);
+          const linked = Boolean(mappedId || razorpayPlanId);
+          return {
+            ...plan,
+            checkoutAvailable:
+              plan.priceCents === 0 ||
+              plan.priceCents < 0 ||
+              linked,
+          };
+        }),
       },
     });
   } catch (err) {
