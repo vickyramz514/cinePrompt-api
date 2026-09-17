@@ -72,12 +72,23 @@ export const listPlans = async (req, res, next) => {
         billingCycle: true,
         features: true,
         adminOnly: true,
+        sortOrder: true,
+        metadata: true,
+        razorpayPlanId: true,
       },
     });
 
     res.json({
       success: true,
-      data: { plans },
+      data: {
+        plans: plans.map(({ razorpayPlanId, ...plan }) => ({
+          ...plan,
+          checkoutAvailable:
+            plan.priceCents === 0 ||
+            plan.priceCents < 0 ||
+            Boolean(razorpayPlanId),
+        })),
+      },
     });
   } catch (err) {
     next(err);

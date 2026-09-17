@@ -46,6 +46,38 @@ const plans = [
     isActive: true,
     adminOnly: false,
     sortOrder: 1,
+    metadata: {
+      offerBadge: 'Launch price',
+      compareAtCents: 200000,
+      offerNote: 'Introductory monthly rate — unlock history & backtests',
+      popular: true,
+    },
+  },
+  {
+    name: 'Starter Annual',
+    slug: 'starter-annual',
+    description: 'Starter billed yearly — 2 months free vs monthly',
+    priceCents: 1500000, // ₹15,000 / year (= 10 × ₹1,500)
+    currency: 'INR',
+    credits: 1000,
+    creditsPerMonth: 1000,
+    billingCycle: 'yearly',
+    razorpayPlanId: null, // Create yearly plan in Razorpay, then link
+    features: [
+      'Everything in Starter',
+      'Billed annually',
+      'Save ₹3,000 vs 12× monthly',
+      '1,000 requests/day',
+    ],
+    isActive: true,
+    adminOnly: false,
+    sortOrder: 2,
+    metadata: {
+      offerBadge: 'Save ₹3,000/yr',
+      compareAtCents: 1800000,
+      offerNote: '2 months free compared with monthly Starter',
+      popular: false,
+    },
   },
   {
     name: 'Pro',
@@ -60,7 +92,11 @@ const plans = [
     features: ['10,000 requests/day', 'Historical ETF data', 'Higher limits', 'Priority support'],
     isActive: true,
     adminOnly: false,
-    sortOrder: 2,
+    sortOrder: 3,
+    metadata: {
+      offerBadge: null,
+      popular: false,
+    },
   },
   {
     name: 'Creator',
@@ -90,7 +126,7 @@ const plans = [
     features: ['100,000 requests/day', 'Historical ETF data', 'High-volume production', 'Priority support'],
     isActive: true,
     adminOnly: false,
-    sortOrder: 3,
+    sortOrder: 4,
   },
   {
     name: 'Admin Test',

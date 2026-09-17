@@ -19,9 +19,22 @@ import referralRoutes from './referralRoutes.js';
 import affiliateRoutes from './affiliateRoutes.js';
 import apiKeyRoutes from './apiKeyRoutes.js';
 import usageRoutes from './usageRoutes.js';
+import rateLimit from 'express-rate-limit';
 import * as statusController from '../controllers/statusController.js';
+import * as publicDemoController from '../controllers/publicDemoController.js';
 
 const router = Router();
+
+const publicDemoLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMIT', message: 'Too many demo requests. Try again shortly.' },
+  },
+});
 
 router.get('/', (req, res) => {
   res.json({
@@ -30,6 +43,8 @@ router.get('/', (req, res) => {
     version: '1.0',
     endpoints: {
       health: 'GET /v1/health',
+      status: 'GET /v1/status',
+      publicDemo: 'GET /v1/public/demo',
       auth: {
         signup: 'POST /v1/auth/signup',
         login: 'POST /v1/auth/login',
@@ -111,5 +126,6 @@ router.get('/health', (req, res) => {
 });
 
 router.get('/status', statusController.getStatus);
+router.get('/public/demo', publicDemoLimiter, publicDemoController.getPublicDemo);
 
 export default router;
