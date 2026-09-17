@@ -19,6 +19,9 @@ import { runStartupChecks } from './utils/startupChecks.js';
 import { sequelize } from './datacaptain/models/index.js';
 import { attachWebSocket } from './datacaptain/ws/priceStream.js';
 import { isOriginAllowed, parseCorsOriginList } from './utils/corsOrigins.js';
+import { initSentry } from './utils/sentry.js';
+
+await initSentry();
 
 const app = express();
 const server = http.createServer(app);

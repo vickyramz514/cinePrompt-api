@@ -1,0 +1,42 @@
+name: API CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  schedule:
+    # Uptime-style check every 30 minutes (UTC)
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+jobs:
+  test:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm test
+
+  smoke-health:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Smoke GET /v1/health
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+          UPTIME_WEBHOOK_URL: ${{ secrets.UPTIME_WEBHOOK_URL }}
+        run: |
+          export API_BASE_URL="${API_BASE_URL:-https://api.datacaptain.in}"
+          node scripts/smoke-health.mjs

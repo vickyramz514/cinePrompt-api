@@ -6,6 +6,7 @@ import { AppError } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 import { createErrorId } from '../utils/errorId.js';
 import config from '../config/index.js';
+import { captureException } from '../utils/sentry.js';
 
 const exposeDetails =
   config.nodeEnv === 'development' || process.env.EXPOSE_API_ERRORS === 'true';
@@ -29,6 +30,15 @@ export const errorHandler = (err, req, res, next) => {
     method: req.method,
     ...(exposeDetails && { stack: err.stack }),
   });
+
+  if (!isAppError || statusCode >= 500) {
+    captureException(err, {
+      errorId,
+      code,
+      path: req.path,
+      method: req.method,
+    });
+  }
 
   const response = {
     success: false,

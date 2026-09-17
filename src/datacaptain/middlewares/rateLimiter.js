@@ -26,9 +26,15 @@ export async function rateLimiter(req, res, next) {
 
     if (count > limit) {
       logger.warn(`Rate limit exceeded for user ${user.id}`);
+      res.setHeader("X-RateLimit-Limit", limit);
+      res.setHeader("X-RateLimit-Remaining", 0);
       return res.status(429).json({
-        error: true,
-        message: "Daily rate limit exceeded. Upgrade your plan for more requests.",
+        success: false,
+        error: {
+          code: "RATE_LIMIT",
+          message: "Daily rate limit exceeded. Upgrade your plan for more requests.",
+          hint: "Check X-RateLimit-Remaining on responses, or GET /v1/developer/usage",
+        },
       });
     }
     next();
