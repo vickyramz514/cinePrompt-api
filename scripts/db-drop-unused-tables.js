@@ -7,29 +7,29 @@
  *   node scripts/db-drop-unused-tables.js --apply      # drop unused tables
  *   node scripts/db-drop-unused-tables.js --apply --video  # also drop video pipeline
  */
-import "dotenv/config";
-import { PrismaClient } from "@prisma/client";
+import 'dotenv/config';
+import { PrismaClient } from '@prisma/client';
 
-const APPLY = process.argv.includes("--apply");
-const INCLUDE_VIDEO = process.argv.includes("--video");
+const APPLY = process.argv.includes('--apply');
+const INCLUDE_VIDEO = process.argv.includes('--video');
 
 const UNUSED_PRISMA_TABLES = [
-  { name: "CreditUsageLog", note: "Never written or read" },
-  { name: "VideoAsset", note: "Legacy video asset store" },
-  { name: "ApiUsage", note: "Superseded by Sequelize api_usage" },
-  { name: "NotificationPreference", note: "No preference UI or API" },
-  { name: "ErrorLog", note: "Errors go to logs, not DB" },
-  { name: "SystemSettings", note: "Feature flags not implemented" },
-  { name: "AuditLog", note: "AdminAuditLog used instead" },
-  { name: "SystemMetrics", note: "Metrics not implemented" },
+  { name: 'CreditUsageLog', note: 'Never written or read' },
+  { name: 'VideoAsset', note: 'Legacy video asset store' },
+  { name: 'ApiUsage', note: 'Superseded by Sequelize api_usage' },
+  { name: 'NotificationPreference', note: 'No preference UI or API' },
+  { name: 'ErrorLog', note: 'Errors go to logs, not DB' },
+  { name: 'SystemSettings', note: 'Feature flags not implemented' },
+  { name: 'AuditLog', note: 'AdminAuditLog used instead' },
+  { name: 'SystemMetrics', note: 'Metrics not implemented' },
 ];
 
 const VIDEO_PIPELINE_TABLES = [
-  { name: "JobStep", note: "Video pipeline step log" },
-  { name: "VideoJob", note: "Legacy video generation jobs" },
-  { name: "CreditLock", note: "Pre-charge locks for video" },
-  { name: "ApiCostLog", note: "Video provider cost log" },
-  { name: "AbuseLog", note: "Video abuse tracking" },
+  { name: 'JobStep', note: 'Video pipeline step log' },
+  { name: 'VideoJob', note: 'Legacy video generation jobs' },
+  { name: 'CreditLock', note: 'Pre-charge locks for video' },
+  { name: 'ApiCostLog', note: 'Video provider cost log' },
+  { name: 'AbuseLog', note: 'Video abuse tracking' },
 ];
 
 const DROP_UNUSED_SQL = `
@@ -96,29 +96,29 @@ async function main() {
 
   console.log(
     APPLY
-      ? `Applying cleanup${INCLUDE_VIDEO ? " (including video pipeline)" : ""}...\n`
-      : `Dry run${INCLUDE_VIDEO ? " (including video pipeline)" : ""}:\n`
+      ? `Applying cleanup${INCLUDE_VIDEO ? ' (including video pipeline)' : ''}...\n`
+      : `Dry run${INCLUDE_VIDEO ? ' (including video pipeline)' : ''}:\n`
   );
 
   const totalRows = await reportTables(tables);
   console.log(`\nTotal rows in listed tables: ${totalRows.toLocaleString()}`);
 
   if (!APPLY) {
-    console.log("\nNo changes made. Run with --apply to drop tables.");
-    console.log("Add --video to include VideoJob and related tables.");
-    console.log("Or deploy migrations: npm run db:migrate:prod");
+    console.log('\nNo changes made. Run with --apply to drop tables.');
+    console.log('Add --video to include VideoJob and related tables.');
+    console.log('Or deploy migrations: npm run db:migrate:prod');
     return;
   }
 
   if (totalRows > 0) {
-    console.warn("\nWarning: some tables still contain rows. Proceeding anyway.");
+    console.warn('\nWarning: some tables still contain rows. Proceeding anyway.');
   }
 
   await prisma.$executeRawUnsafe(DROP_UNUSED_SQL);
   if (INCLUDE_VIDEO) {
     await prisma.$executeRawUnsafe(DROP_VIDEO_SQL);
   }
-  console.log("\nDropped tables and enums.");
+  console.log('\nDropped tables and enums.');
 }
 
 main()

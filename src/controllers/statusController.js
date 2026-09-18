@@ -49,15 +49,15 @@ export const getStatus = async (req, res) => {
   if (services.find((s) => s.id === 'database')?.status === 'operational') {
     try {
       const [priceRow] = await sequelize.query(
-        `SELECT MAX(date)::text AS latest FROM historical_prices`,
+        'SELECT MAX(date)::text AS latest FROM historical_prices',
         { type: sequelize.QueryTypes.SELECT }
       );
       const [metricsRow] = await sequelize.query(
-        `SELECT MAX(as_of_date)::text AS latest FROM etf_metrics`,
+        'SELECT MAX(as_of_date)::text AS latest FROM etf_metrics',
         { type: sequelize.QueryTypes.SELECT }
       );
       const [countRow] = await sequelize.query(
-        `SELECT COUNT(*)::int AS count FROM historical_prices`,
+        'SELECT COUNT(*)::int AS count FROM historical_prices',
         { type: sequelize.QueryTypes.SELECT }
       );
       const etfCount = await prisma.instrument.count({

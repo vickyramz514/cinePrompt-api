@@ -17,37 +17,37 @@
  *   COMPUTE_METRICS=1 — run etf metrics after sync (default 0)
  */
 
-import "../src/config/ensureEnv.js";
-import { createReadStream, existsSync, readFileSync, writeFileSync, readdirSync } from "fs";
-import { resolve, dirname, join } from "path";
-import { fileURLToPath } from "url";
-import { parse } from "csv-parse";
-import pg from "pg";
-import { PrismaClient } from "@prisma/client";
-import sequelize from "../src/datacaptain/config/database.js";
+import '../src/config/ensureEnv.js';
+import { createReadStream, existsSync, readFileSync, writeFileSync, readdirSync } from 'fs';
+import { resolve, dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+import { parse } from 'csv-parse';
+import pg from 'pg';
+import { PrismaClient } from '@prisma/client';
+import sequelize from '../src/datacaptain/config/database.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = resolve(__dirname, "..");
+const ROOT = resolve(__dirname, '..');
 
 const DMD_DIR = process.env.DMD_DIR;
-const US_ONLY = process.env.US_ONLY !== "0";
-const SINCE = process.env.SINCE || "2010-01-01";
-const BATCH_SIZE = Math.max(100, parseInt(process.env.BATCH_SIZE || "2000", 10));
-const SYNC_HISTORICAL = process.env.SYNC_HISTORICAL !== "0";
-const RESUME = process.env.RESUME !== "0";
+const US_ONLY = process.env.US_ONLY !== '0';
+const SINCE = process.env.SINCE || '2010-01-01';
+const BATCH_SIZE = Math.max(100, parseInt(process.env.BATCH_SIZE || '2000', 10));
+const SYNC_HISTORICAL = process.env.SYNC_HISTORICAL !== '0';
+const RESUME = process.env.RESUME !== '0';
 const MAX_FILES = process.env.MAX_FILES ? parseInt(process.env.MAX_FILES, 10) : null;
-const COMPUTE_METRICS = process.env.COMPUTE_METRICS === "1";
+const COMPUTE_METRICS = process.env.COMPUTE_METRICS === '1';
 
-const PROGRESS_FILE = resolve(ROOT, ".dmd-import-progress.json");
+const PROGRESS_FILE = resolve(ROOT, '.dmd-import-progress.json');
 
 const prisma = new PrismaClient();
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 
 function getCol(row, name) {
   const key = Object.keys(row).find(
-    (k) => k.replace(/"/g, "").toLowerCase() === name.toLowerCase()
+    (k) => k.replace(/"/g, '').toLowerCase() === name.toLowerCase()
   );
-  return key ? String(row[key] ?? "").trim() : "";
+  return key ? String(row[key] ?? '').trim() : '';
 }
 
 function parsePrice(row, ...names) {
@@ -59,48 +59,48 @@ function parsePrice(row, ...names) {
 }
 
 function rowToRecord(row, allowedIds) {
-  const instrumentId = getCol(row, "firstbridge_id");
-  const asOfDate = getCol(row, "as_of_date");
+  const instrumentId = getCol(row, 'firstbridge_id');
+  const asOfDate = getCol(row, 'as_of_date');
   if (!instrumentId || !asOfDate || asOfDate < SINCE) return null;
   if (!allowedIds.has(instrumentId)) return null;
 
   const closeVal = parsePrice(
     row,
-    "close_price_split_dividend_adjusted",
-    "close_price_split_adjusted",
-    "close_price_unadjusted"
+    'close_price_split_dividend_adjusted',
+    'close_price_split_adjusted',
+    'close_price_unadjusted'
   );
   if (!closeVal) return null;
 
   const openVal = parsePrice(
     row,
-    "open_price_split_dividend_adjusted",
-    "open_price_split_adjusted",
-    "open_price_unadjusted"
+    'open_price_split_dividend_adjusted',
+    'open_price_split_adjusted',
+    'open_price_unadjusted'
   );
   const highVal = parsePrice(
     row,
-    "high_price_split_dividend_adjusted",
-    "high_price_split_adjusted",
-    "high_price_unadjusted"
+    'high_price_split_dividend_adjusted',
+    'high_price_split_adjusted',
+    'high_price_unadjusted'
   );
   const lowVal = parsePrice(
     row,
-    "low_price_split_dividend_adjusted",
-    "low_price_split_adjusted",
-    "low_price_unadjusted"
+    'low_price_split_dividend_adjusted',
+    'low_price_split_adjusted',
+    'low_price_unadjusted'
   );
 
   const open = openVal || closeVal;
   const high = highVal || closeVal;
   const low = lowVal || closeVal;
 
-  const volRaw = getCol(row, "volume_traded");
+  const volRaw = getCol(row, 'volume_traded');
   const vol = volRaw ? Math.round(parseFloat(volRaw)) : null;
   const volume = Number.isFinite(vol) && vol > 0 ? vol : null;
 
   const navRaw =
-    getCol(row, "nav_split_dividend_adjusted") || getCol(row, "nav_split_adjusted");
+    getCol(row, 'nav_split_dividend_adjusted') || getCol(row, 'nav_split_adjusted');
   const navParsed = navRaw ? parseFloat(navRaw) : null;
   const nav = Number.isFinite(navParsed) && navParsed > 0 ? navParsed : null;
 
@@ -109,7 +109,7 @@ function rowToRecord(row, allowedIds) {
 
 async function loadAllowedInstrumentIds() {
   const where = US_ONLY
-    ? { OR: [{ listingCountryCode: "US" }, { listingCountryCode: null }] }
+    ? { OR: [{ listingCountryCode: 'US' }, { listingCountryCode: null }] }
     : {};
   const rows = await prisma.instrument.findMany({
     where,
@@ -134,7 +134,7 @@ function listBatchFiles() {
 function loadProgress() {
   if (!RESUME || !existsSync(PROGRESS_FILE)) return { completedFiles: [] };
   try {
-    return JSON.parse(readFileSync(PROGRESS_FILE, "utf8"));
+    return JSON.parse(readFileSync(PROGRESS_FILE, 'utf8'));
   } catch {
     return { completedFiles: [] };
   }
@@ -148,14 +148,14 @@ async function insertBatch(records) {
   if (!records.length) return 0;
 
   const cols = [
-    "instrumentId",
-    "asOfDate",
-    "open",
-    "high",
-    "low",
-    "close",
-    "volume",
-    "nav",
+    'instrumentId',
+    'asOfDate',
+    'open',
+    'high',
+    'low',
+    'close',
+    'volume',
+    'nav',
   ];
   const values = [];
   const params = [];
@@ -179,7 +179,7 @@ async function insertBatch(records) {
 
   const sql = `
     INSERT INTO "MarketData" (id, "instrumentId", "asOfDate", open, high, low, close, volume, nav, "createdAt", "updatedAt")
-    VALUES ${values.join(",\n")}
+    VALUES ${values.join(',\n')}
     ON CONFLICT ("instrumentId", "asOfDate") DO UPDATE SET
       open = EXCLUDED.open,
       high = EXCLUDED.high,
@@ -254,7 +254,7 @@ async function syncHistoricalForInstruments(instrumentIds) {
 }
 
 async function syncHistoricalPrices() {
-  console.log("\nSyncing ALL historical_prices from MarketData…");
+  console.log('\nSyncing ALL historical_prices from MarketData…');
   await sequelize.query(`
     INSERT INTO historical_prices (id, symbol, date, open, high, low, close, volume, created_at, updated_at)
     SELECT gen_random_uuid(), i.symbol, m."asOfDate"::date,
@@ -274,14 +274,14 @@ async function syncHistoricalPrices() {
 
 async function main() {
   if (!DMD_DIR) {
-    throw new Error("Set DMD_DIR to the folder containing dmd_batch_*.csv files");
+    throw new Error('Set DMD_DIR to the folder containing dmd_batch_*.csv files');
   }
 
-  console.log("DMD bulk import");
-  console.log("  DMD_DIR:", DMD_DIR);
-  console.log("  US_ONLY:", US_ONLY);
-  console.log("  SINCE:", SINCE);
-  console.log("  BATCH_SIZE:", BATCH_SIZE);
+  console.log('DMD bulk import');
+  console.log('  DMD_DIR:', DMD_DIR);
+  console.log('  US_ONLY:', US_ONLY);
+  console.log('  SINCE:', SINCE);
+  console.log('  BATCH_SIZE:', BATCH_SIZE);
 
   const allowedIds = await loadAllowedInstrumentIds();
   console.log(`  Allowed instruments: ${allowedIds.size.toLocaleString()}`);
@@ -324,14 +324,14 @@ async function main() {
   }
 
   if (COMPUTE_METRICS && completed.size === files.length) {
-    console.log("\nRunning etf:compute-metrics…");
-    const { spawn } = await import("child_process");
+    console.log('\nRunning etf:compute-metrics…');
+    const { spawn } = await import('child_process');
     await new Promise((resolve, reject) => {
-      const child = spawn("node", ["scripts/compute-etf-metrics.js"], {
+      const child = spawn('node', ['scripts/compute-etf-metrics.js'], {
         cwd: ROOT,
-        stdio: "inherit",
+        stdio: 'inherit',
       });
-      child.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`metrics exit ${code}`))));
+      child.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`metrics exit ${code}`))));
     });
   }
 
@@ -343,7 +343,7 @@ async function main() {
 
 main()
   .catch((err) => {
-    console.error("Import failed:", err);
+    console.error('Import failed:', err);
     process.exit(1);
   })
   .finally(async () => {

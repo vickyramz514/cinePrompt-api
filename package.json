@@ -8,6 +8,8 @@
     "start": "node src/server.js",
     "start:prod": "prisma migrate deploy && node src/server.js",
     "dev": "node --watch src/server.js",
+    "lint": "eslint src/**/*.js scripts/**/*.js",
+    "lint:fix": "eslint src/**/*.js scripts/**/*.js --fix",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:prod": "prisma migrate deploy",
@@ -69,6 +71,11 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "eslint": "^8.57.1",
+    "eslint-config-standard": "^17.1.0",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^7.3.0",
     "nodemon": "^3.1.7"
   }
 }

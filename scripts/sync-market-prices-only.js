@@ -3,23 +3,23 @@
  * Usage: MARKET_CSV_PATH=/path/to/market_data_prod.csv node scripts/sync-market-prices-only.js
  */
 
-import "../src/config/ensureEnv.js";
-import { createReadStream } from "fs";
-import { resolve } from "path";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
-import { parse } from "csv-parse";
-import { PrismaClient } from "@prisma/client";
-import sequelize from "../src/datacaptain/config/database.js";
+import '../src/config/ensureEnv.js';
+import { createReadStream } from 'fs';
+import { resolve } from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import { parse } from 'csv-parse';
+import { PrismaClient } from '@prisma/client';
+import sequelize from '../src/datacaptain/config/database.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = resolve(__dirname, "../..");
-const MARKET_CSV = process.env.MARKET_CSV_PATH || resolve(ROOT, "market_data_prod.csv");
+const ROOT = resolve(__dirname, '../..');
+const MARKET_CSV = process.env.MARKET_CSV_PATH || resolve(ROOT, 'market_data_prod.csv');
 const prisma = new PrismaClient();
 
 function getCol(row, name) {
-  const key = Object.keys(row).find((k) => k.replace(/"/g, "").toLowerCase() === name.toLowerCase());
-  return key ? (row[key] || "").trim() : "";
+  const key = Object.keys(row).find((k) => k.replace(/"/g, '').toLowerCase() === name.toLowerCase());
+  return key ? (row[key] || '').trim() : '';
 }
 
 async function seedMarketData(csvPath) {
@@ -27,20 +27,20 @@ async function seedMarketData(csvPath) {
   const parser = stream.pipe(parse({ columns: true, relax_column_count: true, bom: true }));
   let count = 0;
   for await (const row of parser) {
-    const instrumentId = getCol(row, "firstbridge_id");
-    const asOfDate = getCol(row, "as_of_date");
+    const instrumentId = getCol(row, 'firstbridge_id');
+    const asOfDate = getCol(row, 'as_of_date');
     if (!instrumentId || !asOfDate) continue;
     const closeVal = parseFloat(
-      getCol(row, "close_price_split_dividend_adjusted") ||
-        getCol(row, "close_price_split_adjusted") ||
-        getCol(row, "close_price_unadjusted") ||
-        "0"
+      getCol(row, 'close_price_split_dividend_adjusted') ||
+        getCol(row, 'close_price_split_adjusted') ||
+        getCol(row, 'close_price_unadjusted') ||
+        '0'
     );
     if (!closeVal) continue;
-    const open = parseFloat(getCol(row, "open_price_split_dividend_adjusted") || String(closeVal));
-    const high = parseFloat(getCol(row, "high_price_split_dividend_adjusted") || String(closeVal));
-    const low = parseFloat(getCol(row, "low_price_split_dividend_adjusted") || String(closeVal));
-    const vol = parseInt(getCol(row, "volume_traded") || "0", 10);
+    const open = parseFloat(getCol(row, 'open_price_split_dividend_adjusted') || String(closeVal));
+    const high = parseFloat(getCol(row, 'high_price_split_dividend_adjusted') || String(closeVal));
+    const low = parseFloat(getCol(row, 'low_price_split_dividend_adjusted') || String(closeVal));
+    const vol = parseInt(getCol(row, 'volume_traded') || '0', 10);
     const volume = Number.isFinite(vol) && vol > 0 ? vol : null;
     await prisma.marketData.upsert({
       where: { instrumentId_asOfDate: { instrumentId, asOfDate: new Date(asOfDate) } },
@@ -68,11 +68,11 @@ async function syncHistoricalPrices() {
 }
 
 async function main() {
-  console.log("Market CSV:", MARKET_CSV);
+  console.log('Market CSV:', MARKET_CSV);
   const n = await seedMarketData(MARKET_CSV);
-  console.log("MarketData rows processed:", n);
+  console.log('MarketData rows processed:', n);
   const rows = await syncHistoricalPrices();
-  console.log("historical_prices synced (upsert batch):", rows);
+  console.log('historical_prices synced (upsert batch):', rows);
 }
 
 main()

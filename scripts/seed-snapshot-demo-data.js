@@ -3,10 +3,10 @@
  * Run: npm run datacaptain:db:seed:snapshot
  */
 
-import "../src/config/ensureEnv.js";
-import { sequelize, StockNews, Earnings, Stock, Company, HistoricalPrice } from "../src/datacaptain/models/index.js";
+import '../src/config/ensureEnv.js';
+import { sequelize, StockNews, Earnings, Stock, Company, HistoricalPrice } from '../src/datacaptain/models/index.js';
 
-const SYMBOLS = ["AAPL", "TSLA", "NVDA", "MSFT", "AMZN", "META", "SPY", "QQQ"];
+const SYMBOLS = ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'AMZN', 'META', 'SPY', 'QQQ'];
 
 function daysFromNow(n) {
   const d = new Date();
@@ -24,17 +24,17 @@ const NEWS_TEMPLATES = [
   (sym, name) => ({
     headline: `${name} (${sym}) shares move on heavy volume`,
     summary: `Traders watch ${sym} as institutional flow picks up ahead of the next earnings window.`,
-    source: "Market Wire",
+    source: 'Market Wire',
   }),
   (sym, name) => ({
     headline: `Analysts update outlook on ${name}`,
     summary: `Street revisions for ${sym} reflect shifting macro and sector sentiment.`,
-    source: "Reuters",
+    source: 'Reuters',
   }),
   (sym) => ({
     headline: `${sym} in focus as US indices digest economic data`,
     summary: `Broad market moves continue to influence ${sym} relative strength.`,
-    source: "Bloomberg",
+    source: 'Bloomberg',
   }),
 ];
 
@@ -42,11 +42,11 @@ async function ensureStocks() {
   for (const symbol of SYMBOLS) {
     await Company.findOrCreate({
       where: { symbol },
-      defaults: { symbol, company_name: symbol, exchange: "NASDAQ" },
+      defaults: { symbol, company_name: symbol, exchange: 'NASDAQ' },
     });
     await Stock.findOrCreate({
       where: { symbol },
-      defaults: { symbol, name: symbol, type: "STOCK", is_active: true },
+      defaults: { symbol, name: symbol, type: 'STOCK', is_active: true },
     });
   }
 }

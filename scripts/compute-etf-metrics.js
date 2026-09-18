@@ -7,15 +7,15 @@
  * Schedule nightly via cron / Railway job after market close.
  */
 
-import "../src/config/ensureEnv.js";
-import sequelize from "../src/datacaptain/config/database.js";
-import { computeAllMetrics } from "../src/datacaptain/services/etfMetricsService.js";
+import '../src/config/ensureEnv.js';
+import sequelize from '../src/datacaptain/config/database.js';
+import { computeAllMetrics } from '../src/datacaptain/services/etfMetricsService.js';
 
 async function main() {
   await sequelize.authenticate();
-  console.log("Computing ETF metrics...");
+  console.log('Computing ETF metrics...');
 
-  const { EtfMetrics } = await import("../src/datacaptain/models/index.js");
+  const { EtfMetrics } = await import('../src/datacaptain/models/index.js');
   await EtfMetrics.sync({ alter: true });
 
   const result = await computeAllMetrics({
