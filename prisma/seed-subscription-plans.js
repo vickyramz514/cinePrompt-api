@@ -4,8 +4,8 @@
  *
  * Plans:
  * - Free: ₹0, 50 requests/day
- * - Starter: ₹1,500/month, 1,000 requests/day
- * - Pro: ₹2,500/month, 10,000 requests/day
+ * - Starter: ₹500/month, 1,000 requests/day
+ * - Pro: ₹1,000/month, 10,000 requests/day
  * - Ultra: ₹5,000/month, 100,000 requests/day
  * - Admin Test: ₹1/month (Razorpay plan_TMjQVr5OqTfKX8) — adminOnly
  *
@@ -36,20 +36,20 @@ const plans = [
     name: 'Starter',
     slug: 'starter',
     description: 'For developers and small projects',
-    priceCents: 150000, // ₹1,500
+    priceCents: 50000, // ₹500
     currency: 'INR',
     credits: 1000,
     creditsPerMonth: 1000,
     billingCycle: 'monthly',
-    razorpayPlanId: 'plan_Sp9WM3OwrVh2Ow',
+    razorpayPlanId: 'plan_ThlbFgqWAN6Bgm',
     features: ['1,000 requests/day', 'Historical ETF data', 'Backtesting', 'Email support'],
     isActive: true,
     adminOnly: false,
     sortOrder: 1,
     metadata: {
       offerBadge: 'Launch price',
-      compareAtCents: 200000,
-      offerNote: 'Introductory monthly rate — unlock history & backtests',
+      compareAtCents: null,
+      offerNote: 'Unlock history & backtests',
       popular: true,
     },
   },
@@ -57,7 +57,9 @@ const plans = [
     name: 'Starter Annual',
     slug: 'starter-annual',
     description: 'Starter billed yearly — 2 months free vs monthly',
-    priceCents: 1500000, // ₹15,000 / year (= 10 × ₹1,500)
+    // Razorpay plan is still ₹15,000/yr, which now costs more than 12× the ₹500 monthly Starter.
+    // Keep inactive (existing annual subscribers still resolve) until a new annual plan is created.
+    priceCents: 1500000,
     currency: 'INR',
     credits: 1000,
     creditsPerMonth: 1000,
@@ -69,7 +71,7 @@ const plans = [
       'Save ₹3,000 vs 12× monthly',
       '1,000 requests/day',
     ],
-    isActive: true,
+    isActive: false,
     adminOnly: false,
     sortOrder: 2,
     metadata: {
@@ -83,12 +85,12 @@ const plans = [
     name: 'Pro',
     slug: 'pro',
     description: 'For growing applications',
-    priceCents: 250000, // ₹2,500
+    priceCents: 100000, // ₹1,000
     currency: 'INR',
     credits: 10000,
     creditsPerMonth: 10000,
     billingCycle: 'monthly',
-    razorpayPlanId: 'plan_SwfausudpObmnp',
+    razorpayPlanId: 'plan_ThlbS3sIHMMrPU',
     features: ['10,000 requests/day', 'Historical ETF data', 'Higher limits', 'Priority support'],
     isActive: true,
     adminOnly: false,

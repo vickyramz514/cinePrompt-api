@@ -45,7 +45,10 @@ export function resolvePlanSlugByRazorpayId(razorpayPlanId) {
       if (mappedId && mappedId === id) return slug;
     }
   }
-  return null;
+
+  // Retired plan IDs (id → slug) so renewals from subscribers on old prices still resolve.
+  const legacy = loadPlanMapFile('razorpay-plans.legacy.json');
+  return legacy[id] || null;
 }
 
 /**

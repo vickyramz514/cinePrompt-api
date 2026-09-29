@@ -45,7 +45,7 @@ If you get "requested URL was not found", Subscriptions may not be enabled. Cont
 **Option B: Via Dashboard + link script**
 
 1. Razorpay Dashboard → **Subscriptions** → **Plans** → Create Plan
-2. Create monthly plans: Starter (₹1500), Pro (₹2500), Ultra (₹5000)
+2. Create monthly plans: Starter (₹500), Pro (₹1000), Ultra (₹5000)
 3. Copy each `plan_xxx` ID into:
    - `scripts/razorpay-plans.test.json` (test mode IDs)
    - `scripts/razorpay-plans.live.json` (live mode IDs)
