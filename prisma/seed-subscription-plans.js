@@ -6,7 +6,7 @@
  * - Free: ₹0, 50 requests/day
  * - Starter: ₹500/month, 1,000 requests/day
  * - Pro: ₹1,000/month, 10,000 requests/day
- * - Ultra: ₹5,000/month, 100,000 requests/day
+ * - Ultra: retired (inactive) — kept so existing subscribers still resolve
  * - Admin Test: ₹1/month (Razorpay plan_TMjQVr5OqTfKX8) — adminOnly
  *
  * Razorpay plan IDs: Create plans in Razorpay Dashboard or via API, then set here.
@@ -126,7 +126,7 @@ const plans = [
     billingCycle: 'monthly',
     razorpayPlanId: 'plan_SwfbIF8TLF3IFq',
     features: ['100,000 requests/day', 'Historical ETF data', 'High-volume production', 'Priority support'],
-    isActive: true,
+    isActive: false,
     adminOnly: false,
     sortOrder: 4,
   },
