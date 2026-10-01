@@ -87,6 +87,11 @@ export const google = async (req, res, next) => {
     }
 
     const result = await googleAuthService.loginWithGoogle(parsed.data.credential);
+     sendMail({
+      to: result.email,
+      subject: 'Login Notification',
+      body: 'You have successfully logged in.'
+    }).catch(() => {});
     res.json({
       success: true,
       data: result,
