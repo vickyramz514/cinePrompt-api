@@ -11,6 +11,7 @@ import { authenticate } from '../middlewares/auth.js';
 import { adminOnly } from '../middlewares/adminOnly.js';
 import * as adminController from '../controllers/adminController.js';
 import * as adminSupportController from '../controllers/adminSupportController.js';
+import * as marketingEmailController from '../controllers/marketingEmailController.js';
 import * as growthAnalyticsService from '../services/growthAnalyticsService.js';
 import * as investorService from '../services/investorService.js';
 import * as referralService from '../services/referralService.js';
@@ -43,6 +44,13 @@ router.post('/users/:id/credit', adminController.updateUserCredit);
 router.post('/users/:id/block', adminController.blockUser);
 router.post('/users/:id/unblock', adminController.unblockUser);
 router.post('/users/:id/plan-override', adminController.planOverride);
+
+// Marketing emails
+router.get('/marketing/audience', marketingEmailController.getAudience);
+router.post('/marketing/preview', marketingEmailController.preview);
+router.post('/marketing/test', marketingEmailController.sendTest);
+router.get('/marketing/campaigns', marketingEmailController.listCampaigns);
+router.post('/marketing/campaigns', marketingEmailController.createCampaign);
 
 // Payments
 router.get('/payments', adminController.getPayments);

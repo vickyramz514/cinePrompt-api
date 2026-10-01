@@ -162,6 +162,25 @@ const config = {
     cdnBaseUrl: process.env.CDN_BASE_URL || null, // e.g. https://cdn.example.com
   },
 
+  // Outbound email (SMTP — works with Resend, Amazon SES, Zoho, Brevo, Gmail Workspace)
+  email: {
+    smtp: {
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '587', 10),
+      secure: process.env.SMTP_SECURE === 'true',
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+    from: process.env.EMAIL_FROM || 'DataCaptain <hello@datacaptain.in>',
+    replyTo: process.env.EMAIL_REPLY_TO || undefined,
+    appUrl: (process.env.APP_PUBLIC_URL || 'https://www.datacaptain.in').replace(/\/$/, ''),
+    unsubscribeSecret:
+      process.env.EMAIL_UNSUBSCRIBE_SECRET || process.env.JWT_ACCESS_SECRET || 'change-me-in-production',
+    // Pause between messages so we stay under provider rate limits
+    sendDelayMs: parseInt(process.env.EMAIL_SEND_DELAY_MS || '250', 10),
+    postalAddress: process.env.EMAIL_POSTAL_ADDRESS || '',
+  },
+
   // Rate limiting
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10),

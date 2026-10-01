@@ -19,6 +19,7 @@ import referralRoutes from './referralRoutes.js';
 import affiliateRoutes from './affiliateRoutes.js';
 import apiKeyRoutes from './apiKeyRoutes.js';
 import usageRoutes from './usageRoutes.js';
+import emailRoutes from './emailRoutes.js';
 import rateLimit from 'express-rate-limit';
 import * as statusController from '../controllers/statusController.js';
 import * as publicDemoController from '../controllers/publicDemoController.js';
@@ -112,6 +113,7 @@ router.use('/referral', referralRoutes);
 router.use('/affiliate', affiliateRoutes);
 router.use('/api-keys', apiKeyRoutes);
 router.use('/usage', usageRoutes);
+router.use('/email', emailRoutes);
 
 // DataCaptain - market data APIs (x-api-key auth); only for /stocks, /market, /developer, /etf, /options, etc.
 const datacaptainPaths = ['/stocks', '/market', '/search', '/screener', '/indicators', '/ai', '/developer', '/etf', '/backtest', '/portfolio', '/options', '/insiders', '/sentiment', '/economy', '/darkpool'];

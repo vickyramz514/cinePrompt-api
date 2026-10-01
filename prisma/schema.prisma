@@ -108,6 +108,8 @@ model User {
   isActive      Boolean      @default(true)
   lastLoginAt   DateTime?
   referralCode  String?      @unique // For referral/affiliate invites
+  marketingOptOut   Boolean   @default(false)
+  marketingOptOutAt DateTime?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
@@ -351,6 +353,28 @@ model AdminAuditLog {
 
   @@index([adminId])
   @@index([targetType, targetId])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// MARKETING EMAIL CAMPAIGNS
+// =============================================================================
+
+model EmailCampaign {
+  id              String    @id @default(uuid())
+  subject         String
+  audience        String    // free | lapsed | all
+  status          String    @default("SENDING") // SENDING | COMPLETED | FAILED
+  content         Json
+  totalRecipients Int       @default(0)
+  sentCount       Int       @default(0)
+  failedCount     Int       @default(0)
+  lastError       String?
+  createdById     String
+  createdAt       DateTime  @default(now())
+  completedAt     DateTime?
+
+  @@index([status])
   @@index([createdAt])
 }
 
