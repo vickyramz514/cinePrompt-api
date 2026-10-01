@@ -2,6 +2,12 @@
  * Shared CORS origin rules for server.js preflight and config.cors.
  */
 
+/** Always allowed marketing/app hosts (apex + www). Do not gate on NODE_ENV. */
+export const DEFAULT_PUBLIC_ORIGINS = [
+  'https://datacaptain.in',
+  'https://www.datacaptain.in',
+];
+
 export function parseCorsOriginList() {
   return process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
@@ -28,13 +34,16 @@ export function isOriginAllowed(origin, { nodeEnv = process.env.NODE_ENV } = {})
   if (!origin) return true;
 
   const envOrigins = parseCorsOriginList();
-  const allowed = envOrigins.length > 0 ? envOrigins : ['http://localhost:3000'];
-  const allowAllInProd = nodeEnv === 'production' && envOrigins.length === 0;
+  const allowed = [...new Set([
+    ...DEFAULT_PUBLIC_ORIGINS,
+    ...envOrigins,
+    ...(envOrigins.length > 0 ? [] : ['http://localhost:3000']),
+  ])];
 
   return (
-    allowAllInProd ||
     allowed.includes(origin) ||
+    isDatacaptainAppOrigin(origin) ||
     (nodeEnv === 'production' && isVercelPreviewOrigin(origin)) ||
-    (nodeEnv === 'production' && isDatacaptainAppOrigin(origin))
+    (nodeEnv === 'production' && envOrigins.length === 0)
   );
 }

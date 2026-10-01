@@ -37,6 +37,7 @@ app.get('/health', (_req, res) => {
 app.options('*', (req, res) => {
   const origin = req.headers.origin;
 
+  res.setHeader('Vary', 'Origin');
   if (origin && isOriginAllowed(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
@@ -70,6 +71,8 @@ app.use((req, res, next) => {
 app.use(
   helmet({
     crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+    // API is called from datacaptain.in / Vercel; Helmet default same-origin CORP blocks that.
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
   })
 );
 app.use(
