@@ -6,6 +6,7 @@ import * as authService from '../services/authService.js';
 import * as googleAuthService from '../services/googleAuthService.js';
 import { ValidationError } from '../utils/errors.js';
 import { signupSchema, loginSchema, refreshTokenSchema, googleTokenSchema } from '../utils/validators.js';
+import { sendMail } from './emailController.js';
 
 export const signup = async (req, res, next) => {
   try {
@@ -34,6 +35,11 @@ export const login = async (req, res, next) => {
     const result = await authService.login(parsed.data.email, parsed.data.password);
     const { trackEvent } = await import('../services/growthAnalyticsService.js');
     trackEvent('login', result.user.id, {}).catch(() => {});
+    sendMail({
+      to: parsed.data.email,
+      subject: 'Login Notification',
+      body: 'You have successfully logged in.'
+    }).catch(() => {});
     res.json({
       success: true,
       data: result,
