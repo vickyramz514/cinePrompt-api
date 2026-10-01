@@ -6,7 +6,7 @@ import * as authService from '../services/authService.js';
 import * as googleAuthService from '../services/googleAuthService.js';
 import { ValidationError } from '../utils/errors.js';
 import { signupSchema, loginSchema, refreshTokenSchema, googleTokenSchema } from '../utils/validators.js';
-import { sendMail } from './emailController.js';
+import { sendMail } from '../lambda/emailLambda.js';
 
 export const signup = async (req, res, next) => {
   try {
