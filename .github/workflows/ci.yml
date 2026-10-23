@@ -7,6 +7,8 @@ on:
 
 jobs:
   deploy:
+    # Set EC2_DEPLOY_ENABLED to "true" after configuring the EC2_* secrets.
+    if: ${{ vars.EC2_DEPLOY_ENABLED == 'true' }}
     runs-on: ubuntu-latest
 
     steps:
