@@ -23,6 +23,7 @@ import emailRoutes from './emailRoutes.js';
 import rateLimit from 'express-rate-limit';
 import * as statusController from '../controllers/statusController.js';
 import * as publicDemoController from '../controllers/publicDemoController.js';
+import * as pingController from '../controllers/pingController.js';
 
 const router = Router();
 
@@ -44,6 +45,7 @@ router.get('/', (req, res) => {
     version: '1.0',
     endpoints: {
       health: 'GET /v1/health',
+      ping: 'GET /v1/ping',
       status: 'GET /v1/status',
       publicDemo: 'GET /v1/public/demo',
       auth: {
@@ -126,6 +128,8 @@ router.use((req, res, next) => {
 router.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+router.get('/ping', pingController.ping);
 
 router.get('/status', statusController.getStatus);
 router.get('/public/demo', publicDemoLimiter, publicDemoController.getPublicDemo);

@@ -122,7 +122,9 @@ export async function getEtfRankings(req, res, next) {
 export async function getEtfBySymbol(req, res, next) {
   try {
     const { symbol } = req.params;
-    const data = await etfService.getEtfBySymbol(symbol);
+    const data = await etfService.getEtfBySymbol(symbol, {
+      historyLimit: req.query.historyLimit,
+    });
 
     if (!data) {
       return res.status(404).json({

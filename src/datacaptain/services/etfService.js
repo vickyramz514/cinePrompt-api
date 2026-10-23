@@ -316,9 +316,20 @@ function maxDrawdown(closes) {
   return roundPct(maxDd);
 }
 
-export async function getEtfBySymbol(symbol) {
+const HISTORY_FETCH_MAX = 4000;
+const HISTORY_RESPONSE_DEFAULT = 1260; // ~5 years of trading days
+const HISTORY_RESPONSE_MAX = 2000;
+
+function clampHistoryLimit(value) {
+  const n = parseInt(value, 10);
+  if (!Number.isFinite(n) || n < 30) return HISTORY_RESPONSE_DEFAULT;
+  return Math.min(n, HISTORY_RESPONSE_MAX);
+}
+
+export async function getEtfBySymbol(symbol, opts = {}) {
   const sym = symbol?.toUpperCase();
   if (!sym) return null;
+  const historyLimit = clampHistoryLimit(opts.historyLimit);
 
   const [stock, priceRows, metrics, dividends] = await Promise.all([
     Stock.findOne({ where: { symbol: sym, type: "ETF" }, raw: true }),
@@ -327,7 +338,7 @@ export async function getEtfBySymbol(symbol) {
       order: [["date", "ASC"]],
       attributes: ["date", "open", "high", "low", "close", "volume"],
       raw: true,
-      limit: 4000,
+      limit: HISTORY_FETCH_MAX,
     }),
     EtfMetrics.findByPk(sym, { raw: true }).catch(() => null),
     Dividend.findAll({
@@ -463,7 +474,7 @@ export async function getEtfBySymbol(symbol) {
     beta,
     maxDrawdown: maxDrawdown(closes.slice(-252)),
     performance,
-    history: prices,
+    history: prices.slice(-historyLimit),
     sparkline: closes.slice(-30),
     dividends: (dividends || []).map((d) => ({
       exDate: d.ex_date,

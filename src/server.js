@@ -23,6 +23,9 @@ import { isOriginAllowed, parseCorsOriginList } from './utils/corsOrigins.js';
 const app = express();
 const server = http.createServer(app);
 
+// Weak ETags + nginx gzip often produce Content-Length mismatches in Chrome.
+app.set("etag", false);
+
 // Trust Railway edge / load balancer so req.ip and rate limits see the real client
 if (config.trustProxy !== false) {
   app.set('trust proxy', config.trustProxy);

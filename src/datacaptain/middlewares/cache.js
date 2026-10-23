@@ -67,7 +67,7 @@ export const cacheKeys = {
     const q = req.query;
     return `etf:rankings:${q.metric || q.category || "return"}:${q.period || "1y"}:${q.basket || ""}:${q.search || ""}:${q.assetClass || ""}:${q.sort || ""}:${q.sortDir || ""}:${q.limit || 20}:${q.offset || 0}`;
   },
-  etfSymbol: (req) => `etf:${req.params.symbol}`,
+  etfSymbol: (req) => `etf:${req.params.symbol}:${req.query.historyLimit || "1260"}`,
   optionsChain: (req) =>
     `options:${req.params.symbol}:${req.query.expirationDate || "all"}:${req.query.limit || 50}`,
   insiderTrades: (req) => `insiders:${req.params.symbol}:${req.query.limit || 50}`,
